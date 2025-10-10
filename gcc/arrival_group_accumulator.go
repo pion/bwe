@@ -5,11 +5,16 @@ package gcc
 
 import (
 	"time"
-
-	"github.com/pion/bwe"
 )
 
-type arrivalGroup []bwe.Packet
+type arrivalGroupItem struct {
+	SequenceNumber uint64
+	Departure      time.Time
+	Arrival        time.Time
+	Size           int
+}
+
+type arrivalGroup []arrivalGroupItem
 
 type arrivalGroupAccumulator struct {
 	next             arrivalGroup
@@ -19,39 +24,63 @@ type arrivalGroupAccumulator struct {
 
 func newArrivalGroupAccumulator() *arrivalGroupAccumulator {
 	return &arrivalGroupAccumulator{
-		next:             make([]bwe.Packet, 0),
+		next:             make([]arrivalGroupItem, 0),
 		burstInterval:    5 * time.Millisecond,
 		maxBurstDuration: 100 * time.Millisecond,
 	}
 }
 
-func (a *arrivalGroupAccumulator) onPacketAcked(ack bwe.Packet) arrivalGroup {
+func (a *arrivalGroupAccumulator) onPacketAcked(
+	sequenceNumber uint64,
+	size int,
+	departure, arrival time.Time,
+) arrivalGroup {
 	if len(a.next) == 0 {
-		a.next = append(a.next, ack)
+		a.next = append(a.next, arrivalGroupItem{
+			SequenceNumber: sequenceNumber,
+			Size:           size,
+			Departure:      departure,
+			Arrival:        arrival,
+		})
 
 		return nil
 	}
 
-	sendTimeDelta := ack.Departure.Sub(a.next[0].Departure)
+	sendTimeDelta := departure.Sub(a.next[0].Departure)
 	if sendTimeDelta < a.burstInterval {
-		a.next = append(a.next, ack)
+		a.next = append(a.next, arrivalGroupItem{
+			SequenceNumber: sequenceNumber,
+			Size:           size,
+			Departure:      departure,
+			Arrival:        arrival,
+		})
 
 		return nil
 	}
 
-	arrivalTimeDeltaLast := ack.Arrival.Sub(a.next[len(a.next)-1].Arrival)
-	arrivalTimeDeltaFirst := ack.Arrival.Sub(a.next[0].Arrival)
+	arrivalTimeDeltaLast := arrival.Sub(a.next[len(a.next)-1].Arrival)
+	arrivalTimeDeltaFirst := arrival.Sub(a.next[0].Arrival)
 	propagationDelta := arrivalTimeDeltaFirst - sendTimeDelta
 
 	if propagationDelta < 0 && arrivalTimeDeltaLast <= a.burstInterval && arrivalTimeDeltaFirst < a.maxBurstDuration {
-		a.next = append(a.next, ack)
+		a.next = append(a.next, arrivalGroupItem{
+			SequenceNumber: sequenceNumber,
+			Size:           size,
+			Departure:      departure,
+			Arrival:        arrival,
+		})
 
 		return nil
 	}
 
 	group := make(arrivalGroup, len(a.next))
 	copy(group, a.next)
-	a.next = arrivalGroup{ack}
+	a.next = arrivalGroup{arrivalGroupItem{
+		SequenceNumber: sequenceNumber,
+		Size:           size,
+		Departure:      departure,
+		Arrival:        arrival,
+	}}
 
 	return group
 }

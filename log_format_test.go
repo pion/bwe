@@ -3,7 +3,7 @@
 
 //go:build !js
 
-package simulation
+package bwe_test
 
 import (
 	"fmt"

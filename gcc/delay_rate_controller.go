@@ -6,7 +6,6 @@ package gcc
 import (
 	"time"
 
-	"github.com/pion/bwe"
 	"github.com/pion/logging"
 )
 
@@ -21,11 +20,11 @@ type delayRateController struct {
 	samples     int
 }
 
-func newDelayRateController(initialRate int, logger logging.LeveledLogger) *delayRateController {
+func newDelayRateController(initialRate int) *delayRateController {
 	return &delayRateController{
-		log:         logger,
+		log:         logging.NewDefaultLoggerFactory().NewLogger("bwe_delay_rate_controller"),
 		aga:         newArrivalGroupAccumulator(),
-		last:        []bwe.Packet{},
+		last:        []arrivalGroupItem{},
 		kf:          newKalmanFilter(),
 		od:          newOveruseDetector(true),
 		rc:          newRateController(initialRate),
@@ -34,8 +33,13 @@ func newDelayRateController(initialRate int, logger logging.LeveledLogger) *dela
 	}
 }
 
-func (c *delayRateController) onPacketAcked(ack bwe.Packet) {
-	next := c.aga.onPacketAcked(ack)
+func (c *delayRateController) onPacketAcked(sequenceNumber uint64, size int, departure, arrival time.Time) {
+	next := c.aga.onPacketAcked(
+		sequenceNumber,
+		size,
+		departure,
+		arrival,
+	)
 	if next == nil {
 		return
 	}
@@ -58,7 +62,7 @@ func (c *delayRateController) onPacketAcked(ack bwe.Packet) {
 	interGroupDelay := interArrivalTime - interDepartureTime
 	estimate := c.kf.update(float64(interGroupDelay.Milliseconds()), float64(sizeDelta))
 	c.samples++
-	c.latestUsage = c.od.update(ack.Arrival, estimate, c.samples)
+	c.latestUsage = c.od.update(arrival, estimate, c.samples)
 	c.last = next
 	c.log.Tracef(
 		"ts=%v.%06d, seq=%v, size=%v, interArrivalTime=%v, interDepartureTime=%v, interGroupDelay=%v, estimate=%v, threshold=%v, usage=%v, state=%v", // nolint
@@ -82,8 +86,8 @@ func (c *delayRateController) update(ts time.Time, lastDeliveryRate int, rtt tim
 
 func groupSize(group arrivalGroup) int {
 	sum := 0
-	for _, ack := range group {
-		sum += int(ack.Size)
+	for _, item := range group {
+		sum += item.Size
 	}
 
 	return sum
