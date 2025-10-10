@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
-//go:build !js
+//go:build !js && go1.25
 
 package simulation
 

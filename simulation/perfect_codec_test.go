@@ -57,7 +57,9 @@ func newPerfectCodec(writer sampleWriter, targetBitrateBps int) *perfectCodec {
 
 // start begins the codec operation, generating frames at the configured frame rate.
 func (c *perfectCodec) start() {
-	c.wg.Go(func() {
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
 		msToNextFrame := time.Duration((1.0/float64(c.fps))*1000.0) * time.Millisecond
 		ticker := time.NewTicker(msToNextFrame)
 		for {
@@ -84,7 +86,7 @@ func (c *perfectCodec) start() {
 				return
 			}
 		}
-	})
+	}()
 }
 
 // Close stops the codec and cleans up resources.
