@@ -3,13 +3,15 @@
 
 //go:build !js
 
-package simulation
+package bwe_test
 
 import (
+	"github.com/pion/bwe/gcc"
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/packetdump"
 	"github.com/pion/interceptor/pkg/rfc8888"
 	"github.com/pion/interceptor/pkg/rtpfb"
+	"github.com/pion/interceptor/pkg/twcc"
 	"github.com/pion/logging"
 	"github.com/pion/transport/v3/vnet"
 	"github.com/pion/webrtc/v4"
@@ -79,17 +81,18 @@ func registerRTPFB() option {
 	}
 }
 
-// func registerTWCC() option {
-// 	return func(p *peer) error {
-// 		twcc, err := twcc.NewSenderInterceptor()
-// 		if err != nil {
-// 			return err
-// 		}
-// 		p.interceptorRegistry.Add(twcc)
-//
-// 		return nil
-// 	}
-// }
+func registerTWCC() option {
+	return func(p *peer) error {
+		twcc, err := twcc.NewSenderInterceptor()
+		if err != nil {
+			return err
+		}
+		p.interceptorRegistry.Add(twcc)
+
+		return nil
+	}
+}
+
 //
 // func registerTWCCHeaderExtension() option {
 // 	return func(p *peer) error {
@@ -115,6 +118,18 @@ func registerCCFB() option {
 	}
 }
 
+func initGCC(onRateUpdate func(int)) option {
+	return func(p *peer) (err error) {
+		p.estimator, err = gcc.NewSendSideController(1_000_000, 128_000, 5_000_000)
+		if err != nil {
+			return err
+		}
+		p.onRateUpdate = onRateUpdate
+
+		return nil
+	}
+}
+
 type peer struct {
 	logger logging.LeveledLogger
 	pc     *webrtc.PeerConnection
@@ -125,6 +140,9 @@ type peer struct {
 
 	onRemoteTrack func(*webrtc.TrackRemote)
 	onConnected   func()
+
+	estimator    *gcc.SendSideController
+	onRateUpdate func(int)
 }
 
 func newPeer(opts ...option) (*peer, error) {
@@ -274,9 +292,35 @@ func (p *peer) addRemoteTrack() error {
 
 func (p *peer) readRTCP(r *webrtc.RTPSender) {
 	for {
-		_, _, err := r.ReadRTCP()
+		_, attr, err := r.ReadRTCP()
 		if err != nil {
 			return
+		}
+		report, ok := attr.Get(rtpfb.CCFBAttributesKey).(rtpfb.Report)
+		if ok {
+			p.updateTargetRate(report)
+		}
+	}
+}
+
+func (p *peer) updateTargetRate(report rtpfb.Report) {
+	if p.estimator != nil {
+		for _, pr := range report.PacketReports {
+			if pr.Arrived {
+				p.estimator.OnAck(
+					pr.SequenceNumber,
+					pr.Size,
+					pr.Departure,
+					pr.Arrival,
+				)
+			} else {
+				p.estimator.OnLoss()
+			}
+		}
+		rate := p.estimator.OnFeedback(report.Arrival, report.RTT)
+		p.logger.Infof("new target rate: %v", rate)
+		if p.onRateUpdate != nil {
+			p.onRateUpdate(rate)
 		}
 	}
 }

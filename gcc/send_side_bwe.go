@@ -6,7 +6,6 @@ package gcc
 import (
 	"time"
 
-	"github.com/pion/bwe"
 	"github.com/pion/logging"
 )
 
@@ -39,7 +38,7 @@ func NewSendSideController(initialRate, minRate, maxRate int, opts ...Option) (*
 		log:        logging.NewDefaultLoggerFactory().NewLogger("bwe_send_side_controller"),
 		dre:        newDeliveryRateEstimator(time.Second),
 		lrc:        newLossRateController(initialRate, minRate, maxRate),
-		drc:        newDelayRateController(initialRate, logging.NewDefaultLoggerFactory().NewLogger("bwe_delay_rate_controller")),
+		drc:        newDelayRateController(initialRate),
 		targetRate: initialRate,
 	}
 	for _, opt := range opts {
@@ -51,30 +50,32 @@ func NewSendSideController(initialRate, minRate, maxRate int, opts ...Option) (*
 	return ssc, nil
 }
 
-// OnAcks must be called when new acknowledgments arrive. arrival is the arrival
-// time of the feedback, RTT is the last measured RTT and acks is a list of
-// Acknowledgments contained in the latest feedback. Packets MUST not be
+func (c *SendSideController) OnLoss() {
+	c.lrc.onPacketLost()
+}
+
+// OnAck must be called when new acknowledgments arrive. Packets MUST not be
 // acknowledged more than once.
-func (c *SendSideController) OnAcks(arrival time.Time, rtt time.Duration, acks []bwe.Packet) int {
-	if len(acks) == 0 {
-		return c.targetRate
+func (c *SendSideController) OnAck(sequenceNumber uint64, size int, departure, arrival time.Time) {
+	c.lrc.onPacketAcked()
+	if !arrival.IsZero() {
+		c.dre.onPacketAcked(arrival, size)
+		c.drc.onPacketAcked(
+			sequenceNumber,
+			size,
+			departure,
+			arrival,
+		)
 	}
+}
 
-	for _, ack := range acks {
-		if ack.Arrived {
-			c.lrc.onPacketAcked()
-			if !ack.Arrival.IsZero() {
-				c.dre.onPacketAcked(ack.Arrival, int(ack.Size))
-				c.drc.onPacketAcked(ack)
-			}
-		} else {
-			c.lrc.onPacketLost()
-		}
-	}
-
+// OnFeedback must be called when a new feedback report arrives. ts is the
+// arrival timestamp of the feedback report. rtt is the latest RTT sample. It
+// returns the new target rate.
+func (c *SendSideController) OnFeedback(ts time.Time, rtt time.Duration) int {
 	delivered := c.dre.getRate()
 	lossTarget := c.lrc.update(delivered)
-	delayTarget := c.drc.update(arrival, delivered, rtt)
+	delayTarget := c.drc.update(ts, delivered, rtt)
 	c.targetRate = min(lossTarget, delayTarget)
 	c.log.Tracef(
 		"rtt=%v, delivered=%v, lossTarget=%v, delayTarget=%v, target=%v",
