@@ -6,6 +6,7 @@
 package simulation
 
 import (
+	"github.com/pion/bwe/gcc"
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/packetdump"
 	"github.com/pion/interceptor/pkg/rfc8888"
@@ -125,6 +126,8 @@ type peer struct {
 
 	onRemoteTrack func(*webrtc.TrackRemote)
 	onConnected   func()
+
+	estimator *gcc.SendSideController
 }
 
 func newPeer(opts ...option) (*peer, error) {
@@ -274,9 +277,13 @@ func (p *peer) addRemoteTrack() error {
 
 func (p *peer) readRTCP(r *webrtc.RTPSender) {
 	for {
-		_, _, err := r.ReadRTCP()
+		_, attr, err := r.ReadRTCP()
 		if err != nil {
 			return
+		}
+		fb, ok := attr.Get(rtpfb.CCFBAttributesKey).([]rtpfb.Report)
+		if ok {
+			p.logger.Infof("got rtpfb: %v", len(fb))
 		}
 	}
 }
