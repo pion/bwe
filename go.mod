@@ -5,7 +5,7 @@ go 1.24
 require (
 	github.com/pion/interceptor v0.1.41-0.20250918133005-ab70b00249ad
 	github.com/pion/logging v0.2.4
-	github.com/pion/rtcp v1.2.15
+	github.com/pion/rtcp v1.2.16
 	github.com/pion/rtp v1.8.23
 	github.com/pion/transport/v3 v3.0.8
 	github.com/pion/webrtc/v4 v4.1.4
