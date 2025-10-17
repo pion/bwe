@@ -54,12 +54,12 @@ func registerDefaultCodecs() option {
 
 func registerPacketLogger(logger *slog.Logger) option {
 	return func(p *peer) error {
-		ipl := &packetLogger{logger: logger, direction: "in"}
+		ipl := newPacketLogger(logger, "in")
 		rd, err := packetdump.NewReceiverInterceptor(packetdump.PacketLog(ipl))
 		if err != nil {
 			return err
 		}
-		opl := &packetLogger{logger: logger, direction: "out"}
+		opl := newPacketLogger(logger, "out")
 		sd, err := packetdump.NewSenderInterceptor(packetdump.PacketLog(opl))
 		if err != nil {
 			return err
