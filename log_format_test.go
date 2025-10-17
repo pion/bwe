@@ -16,15 +16,14 @@ import (
 )
 
 type packetLogger struct {
-	vantagePoint string
-	direction    string
+	logger    *slog.Logger
+	direction string
 }
 
 func (l *packetLogger) LogRTPPacket(header *rtp.Header, payload []byte, attributes interceptor.Attributes) {
 	ts := time.Now()
-	slog.Info(
+	l.logger.Info(
 		"rtp",
-		"vantage-point", l.vantagePoint,
 		"direction", l.direction,
 		"ts", ts,
 		"pt", header.PayloadType,
@@ -38,6 +37,10 @@ func (l *packetLogger) LogRTPPacket(header *rtp.Header, payload []byte, attribut
 
 func (l *packetLogger) LogRTCPPackets(pkts []rtcp.Packet, attributes interceptor.Attributes) {
 	for _, pkt := range pkts {
-		slog.Info("rtcp", "vantage-point", l.vantagePoint, "direction", l.direction, "type", fmt.Sprintf("%T", pkt))
+		l.logger.Info(
+			"rtcp",
+			"direction", l.direction,
+			"type", fmt.Sprintf("%T", pkt),
+		)
 	}
 }

@@ -7,7 +7,11 @@ package bwe_test
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
+	"os"
+	"path/filepath"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -16,9 +20,40 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func testLogger(t *testing.T) (*slog.Logger, func()) {
+	t.Helper()
+
+	logDir := os.Getenv("BWE_LOG_DIR")
+	if logDir == "" {
+		logDir = "logs"
+	}
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
+		t.Fatalf("failed to create log dir %q: %v", logDir, err)
+	}
+
+	filename := filepath.Join(logDir, fmt.Sprintf("%s.jsonl", t.Name()))
+	file, err := os.Create(filename)
+	if err != nil {
+		t.Fatalf("failed to create log file %q: %v", filename, err)
+	}
+
+	handler := slog.NewJSONHandler(file, &slog.HandlerOptions{Level: slog.LevelInfo})
+	logger := slog.New(handler)
+
+	cleanup := func() {
+		file.Sync()
+		file.Close()
+	}
+
+	return logger, cleanup
+}
+
 func TestVnet(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		t.Helper()
+
+		logger, cleanup := testLogger(t)
+		defer cleanup()
 
 		onTrack := make(chan struct{})
 		connected := make(chan struct{})
@@ -47,7 +82,7 @@ func TestVnet(t *testing.T) {
 					}
 				}()
 			}),
-			registerPacketLogger("receiver"),
+			registerPacketLogger(logger.With("vantage-point", "receiver")),
 			registerCCFB(),
 		)
 		assert.NoError(t, err)
@@ -60,7 +95,7 @@ func TestVnet(t *testing.T) {
 			registerDefaultCodecs(),
 			onConnected(func() { close(connected) }),
 			setVNet(network.right, []string{"10.0.2.1"}),
-			registerPacketLogger("sender"),
+			registerPacketLogger(logger.With("vantage-point", "sender")),
 			registerRTPFB(),
 			initGCC(func(rate int) {
 				codec.setTargetBitrate(rate)
