@@ -1,0 +1,100 @@
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background-color: #fafafa;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  background-color: #005bbb;
+  color: white;
+  padding: 1rem 2rem;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+#layout {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* --- Sidebar (vertical tabs) --- */
+#sidebar {
+  width: 220px;
+  background: white;
+  border-right: 1px solid #ccc;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.tab {
+  padding: 0.9rem 1rem;
+  text-align: left;
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-size: 0.95rem;
+  color: #333;
+  transition: background 0.2s, color 0.2s;
+}
+
+.tab:hover {
+  background: #eef3ff;
+}
+
+.tab.active {
+  background: #e5efff;
+  border-left: 4px solid #005bbb;
+  color: #005bbb;
+  font-weight: 600;
+}
+
+/* --- Dashboard area --- */
+#dashboard {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
+}
+
+.test-section {
+  display: none;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.test-section.active {
+  display: block;
+}
+
+.test-section h2 {
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+  border-left: 4px solid #005bbb;
+  padding-left: 0.5rem;
+  color: #333;
+}
+
+.plot {
+  width: 100%;
+  min-height: 400px;
+  margin-top: 1rem;
+}
+
+footer {
+  text-align: center;
+  color: #666;
+  font-size: 0.9rem;
+  padding: 0.5rem 0 1rem 0;
+  border-top: 1px solid #ccc;
+  background: #f8f8f8;
+}
+
