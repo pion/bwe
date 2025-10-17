@@ -6,9 +6,11 @@
 package bwe_test
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -20,35 +22,47 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func testLogger(t *testing.T) (*slog.Logger, func()) {
-	t.Helper()
+var logDir string
 
-	logDir := os.Getenv("BWE_LOG_DIR")
+func TestMain(m *testing.M) {
+	logDir = os.Getenv("BWE_LOG_DIR")
 	if logDir == "" {
-		logDir = "logs"
+		logDir = "test-web/logs"
 	}
 	if err := os.MkdirAll(logDir, 0o755); err != nil {
-		t.Fatalf("failed to create log dir %q: %v", logDir, err)
+		log.Printf("failed to create log dir %q: %v", logDir, err)
+		os.Exit(1)
 	}
 
-	filename := filepath.Join(logDir, fmt.Sprintf("%s.jsonl", t.Name()))
-	file, err := os.Create(filename)
+	ec := m.Run()
+
+	files, err := filepath.Glob(filepath.Join(logDir, "*.jsonl"))
 	if err != nil {
-		t.Fatalf("failed to create log file %q: %v", filename, err)
+		log.Printf("Failed to list JSONL files: %v", err)
 	}
 
-	handler := slog.NewJSONHandler(file, &slog.HandlerOptions{Level: slog.LevelInfo})
-	logger := slog.New(handler)
-
-	cleanup := func() {
-		file.Sync()
-		file.Close()
+	var names []string
+	for _, f := range files {
+		names = append(names, filepath.Base(f))
 	}
 
-	return logger, cleanup
+	b, err := json.Marshal(names)
+	if err != nil {
+		log.Printf("Failed to marshal index.json: %v", err)
+		os.Exit(ec)
+	}
+
+	indexPath := filepath.Join(logDir, "index.json")
+	if err := os.WriteFile(indexPath, b, 0644); err != nil {
+		log.Printf("Failed to write index.json: %v", err)
+	} else {
+		log.Printf("Generated index.json with %d files", len(names))
+	}
+
+	os.Exit(ec)
 }
 
-func TestVnet(t *testing.T) {
+func TestBWE(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		t.Helper()
 
@@ -98,6 +112,7 @@ func TestVnet(t *testing.T) {
 			registerPacketLogger(logger.With("vantage-point", "sender")),
 			registerRTPFB(),
 			initGCC(func(rate int) {
+				logger.Info("setting codec target bitrate", "rate", rate)
 				codec.setTargetBitrate(rate)
 			}),
 		)
@@ -147,4 +162,24 @@ func TestVnet(t *testing.T) {
 
 		synctest.Wait()
 	})
+}
+
+func testLogger(t *testing.T) (*slog.Logger, func()) {
+	t.Helper()
+
+	filename := filepath.Join(logDir, fmt.Sprintf("%s.jsonl", t.Name()))
+	file, err := os.Create(filename)
+	if err != nil {
+		t.Fatalf("failed to create log file %q: %v", filename, err)
+	}
+
+	handler := slog.NewJSONHandler(file, &slog.HandlerOptions{Level: slog.LevelInfo})
+	logger := slog.New(handler)
+
+	cleanup := func() {
+		file.Sync()
+		file.Close()
+	}
+
+	return logger, cleanup
 }
