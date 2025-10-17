@@ -6,6 +6,8 @@
 package bwe_test
 
 import (
+	"log/slog"
+
 	"github.com/pion/bwe/gcc"
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/packetdump"
@@ -50,14 +52,14 @@ func registerDefaultCodecs() option {
 	}
 }
 
-func registerPacketLogger(vantagePoint string) option {
+func registerPacketLogger(logger *slog.Logger) option {
 	return func(p *peer) error {
-		ipl := &packetLogger{vantagePoint: vantagePoint, direction: "in"}
+		ipl := &packetLogger{logger: logger, direction: "in"}
 		rd, err := packetdump.NewReceiverInterceptor(packetdump.PacketLog(ipl))
 		if err != nil {
 			return err
 		}
-		opl := &packetLogger{vantagePoint: vantagePoint, direction: "out"}
+		opl := &packetLogger{logger: logger, direction: "out"}
 		sd, err := packetdump.NewSenderInterceptor(packetdump.PacketLog(opl))
 		if err != nil {
 			return err
