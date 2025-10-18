@@ -32,3 +32,5 @@ require (
 	golang.org/x/sys v0.30.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/pion/transport/v3 v3.0.8 => ../transport
