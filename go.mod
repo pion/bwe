@@ -3,7 +3,7 @@ module github.com/pion/bwe
 go 1.24
 
 require (
-	github.com/pion/interceptor v0.1.41-0.20250918133005-ab70b00249ad
+	github.com/pion/interceptor v0.1.42-0.20251016092317-ce5124bd6cdf
 	github.com/pion/logging v0.2.4
 	github.com/pion/rtcp v1.2.16
 	github.com/pion/rtp v1.8.24
@@ -32,3 +32,5 @@ require (
 	golang.org/x/sys v0.30.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/pion/transport/v3 v3.0.8 => ../transport
