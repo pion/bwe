@@ -67,7 +67,14 @@ func TestMain(m *testing.M) {
 
 func TestBWE(t *testing.T) {
 	networks := map[string]vnetFactory{
-		"constant_capacity": createVirtualNetwork(),
+		"constant_capacity_1mbps_very_low_latency": createVirtualNetwork(1_000_000, 80_000, 50*time.Millisecond),
+		"constant_capacity_5mbps_very_low_latency": createVirtualNetwork(5_000_000, 80_000, 50*time.Millisecond),
+		"constant_capacity_1mbps_low_latency":      createVirtualNetwork(1_000_000, 80_000, 50*time.Millisecond),
+		"constant_capacity_5mbps_low_latency":      createVirtualNetwork(5_000_000, 80_000, 50*time.Millisecond),
+		"constant_capacity_1mbps_medium_latency":   createVirtualNetwork(1_000_000, 80_000, 150*time.Millisecond),
+		"constant_capacity_5mbps_medium_latency":   createVirtualNetwork(5_000_000, 80_000, 150*time.Millisecond),
+		"constant_capacity_1mbps_high_latency":     createVirtualNetwork(1_000_000, 80_000, 300*time.Millisecond),
+		"constant_capacity_5mbps_high_latency":     createVirtualNetwork(5_000_000, 80_000, 300*time.Millisecond),
 	}
 	for name, vnf := range networks {
 		t.Run(name, func(t *testing.T) {
@@ -86,7 +93,6 @@ func TestBWE(t *testing.T) {
 				receiver, err := newPeer(
 					registerDefaultCodecs(),
 					setVNet(network.left, []string{"10.0.1.1"}),
-					registerTWCC(),
 					onRemoteTrack(func(track *webrtc.TrackRemote) {
 						close(onTrack)
 						go func() {
@@ -152,7 +158,7 @@ func TestBWE(t *testing.T) {
 
 				select {
 				case <-onTrack:
-				case <-time.After(time.Second):
+				case <-time.After(5 * time.Second):
 					assert.Fail(t, "on track not called")
 				}
 

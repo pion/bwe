@@ -7,7 +7,7 @@ require (
 	github.com/pion/logging v0.2.4
 	github.com/pion/rtcp v1.2.16
 	github.com/pion/rtp v1.8.24
-	github.com/pion/transport/v3 v3.0.8
+	github.com/pion/transport/v3 v3.0.9-0.20251018195250-6c2e33524ea2
 	github.com/pion/webrtc/v4 v4.1.4
 	github.com/stretchr/testify v1.11.1
 )
@@ -32,5 +32,3 @@ require (
 	golang.org/x/sys v0.30.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/pion/transport/v3 v3.0.8 => ../transport
