@@ -36,7 +36,7 @@ func (n *virtualNetwork) Close() error {
 	)
 }
 
-func createVirtualNetwork() func(*testing.T) *virtualNetwork {
+func createVirtualNetwork(rate, burst int, delay time.Duration) func(*testing.T) *virtualNetwork {
 	return func(t *testing.T) *virtualNetwork {
 		t.Helper()
 
@@ -58,10 +58,14 @@ func createVirtualNetwork() func(*testing.T) *virtualNetwork {
 		})
 		assert.NoError(t, err)
 
-		leftTBF, err := vnet.NewTokenBucketFilter(leftRouter, vnet.TBFRate(1_000_000), vnet.TBFMaxBurst(80_000))
+		leftTBF, err := vnet.NewTokenBucketFilter(
+			leftRouter,
+			vnet.TBFRate(rate),
+			vnet.TBFMaxBurst(burst),
+		)
 		assert.NoError(t, err)
 
-		leftDelay, err := vnet.NewDelayFilter(leftTBF, 10*time.Millisecond)
+		leftDelay, err := vnet.NewDelayFilter(leftTBF, delay)
 		assert.NoError(t, err)
 
 		err = wan.AddNet(leftDelay)
@@ -82,10 +86,14 @@ func createVirtualNetwork() func(*testing.T) *virtualNetwork {
 		})
 		assert.NoError(t, err)
 
-		rightTBF, err := vnet.NewTokenBucketFilter(rightRouter, vnet.TBFRate(1_000_000), vnet.TBFMaxBurst(80_000))
+		rightTBF, err := vnet.NewTokenBucketFilter(
+			rightRouter,
+			vnet.TBFRate(rate),
+			vnet.TBFMaxBurst(burst),
+		)
 		assert.NoError(t, err)
 
-		rightDelay, err := vnet.NewDelayFilter(rightTBF, 10*time.Millisecond)
+		rightDelay, err := vnet.NewDelayFilter(rightTBF, delay)
 		assert.NoError(t, err)
 
 		err = wan.AddNet(rightDelay)
