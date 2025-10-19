@@ -10,6 +10,7 @@ import (
 
 	"github.com/pion/bwe/gcc"
 	"github.com/pion/interceptor"
+	"github.com/pion/interceptor/pkg/pacing"
 	"github.com/pion/interceptor/pkg/packetdump"
 	"github.com/pion/interceptor/pkg/rfc8888"
 	"github.com/pion/interceptor/pkg/rtpfb"
@@ -132,6 +133,15 @@ func initGCC(onRateUpdate func(int)) option {
 	}
 }
 
+func registerPacer() option {
+	return func(p *peer) error {
+		p.pacer = pacing.NewInterceptor()
+		p.interceptorRegistry.Add(p.pacer)
+
+		return nil
+	}
+}
+
 type peer struct {
 	logger logging.LeveledLogger
 	pc     *webrtc.PeerConnection
@@ -143,6 +153,7 @@ type peer struct {
 	onRemoteTrack func(*webrtc.TrackRemote)
 	onConnected   func()
 
+	pacer        *pacing.InterceptorFactory
 	estimator    *gcc.SendSideController
 	onRateUpdate func(int)
 }
@@ -323,6 +334,9 @@ func (p *peer) updateTargetRate(report rtpfb.Report) {
 		p.logger.Infof("new target rate: %v", rate)
 		if p.onRateUpdate != nil {
 			p.onRateUpdate(rate)
+		}
+		if p.pacer != nil {
+			p.pacer.SetRate(p.pc.ID(), rate)
 		}
 	}
 }
