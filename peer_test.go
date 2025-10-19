@@ -14,7 +14,6 @@ import (
 	"github.com/pion/interceptor/pkg/packetdump"
 	"github.com/pion/interceptor/pkg/rfc8888"
 	"github.com/pion/interceptor/pkg/rtpfb"
-	"github.com/pion/interceptor/pkg/twcc"
 	"github.com/pion/logging"
 	"github.com/pion/transport/v3/vnet"
 	"github.com/pion/webrtc/v4"
@@ -86,28 +85,15 @@ func registerRTPFB() option {
 
 func registerTWCC() option {
 	return func(p *peer) error {
-		twcc, err := twcc.NewSenderInterceptor()
-		if err != nil {
-			return err
-		}
-		p.interceptorRegistry.Add(twcc)
-
-		return nil
+		return webrtc.ConfigureTWCCSender(p.mediaEngine, p.interceptorRegistry)
 	}
 }
 
-//
-// func registerTWCCHeaderExtension() option {
-// 	return func(p *peer) error {
-// 		twccHdrExt, err := twcc.NewHeaderExtensionInterceptor()
-// 		if err != nil {
-// 			return err
-// 		}
-// 		p.interceptorRegistry.Add(twccHdrExt)
-//
-// 		return nil
-// 	}
-// }
+func registerTWCCHeaderExtension() option {
+	return func(p *peer) error {
+		return webrtc.ConfigureTWCCHeaderExtensionSender(p.mediaEngine, p.interceptorRegistry)
+	}
+}
 
 func registerCCFB() option {
 	return func(p *peer) error {
@@ -121,12 +107,19 @@ func registerCCFB() option {
 	}
 }
 
-func initGCC(onRateUpdate func(int)) option {
+func initGCC() option {
 	return func(p *peer) (err error) {
 		p.estimator, err = gcc.NewSendSideController(1_000_000, 128_000, 50_000_000)
 		if err != nil {
 			return err
 		}
+
+		return nil
+	}
+}
+
+func setOnRateCallback(onRateUpdate func(int)) option {
+	return func(p *peer) error {
 		p.onRateUpdate = onRateUpdate
 
 		return nil
