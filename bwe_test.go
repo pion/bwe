@@ -67,120 +67,148 @@ func TestMain(m *testing.M) {
 
 func TestBWE(t *testing.T) {
 	networks := map[string]vnetFactory{
-		"constant_capacity_1mbps_very_low_latency": createVirtualNetwork(1_000_000, 80_000, 50*time.Millisecond),
-		"constant_capacity_5mbps_very_low_latency": createVirtualNetwork(5_000_000, 80_000, 50*time.Millisecond),
-		"constant_capacity_1mbps_low_latency":      createVirtualNetwork(1_000_000, 80_000, 50*time.Millisecond),
-		"constant_capacity_5mbps_low_latency":      createVirtualNetwork(5_000_000, 80_000, 50*time.Millisecond),
-		"constant_capacity_1mbps_medium_latency":   createVirtualNetwork(1_000_000, 80_000, 150*time.Millisecond),
-		"constant_capacity_5mbps_medium_latency":   createVirtualNetwork(5_000_000, 80_000, 150*time.Millisecond),
-		"constant_capacity_1mbps_high_latency":     createVirtualNetwork(1_000_000, 80_000, 300*time.Millisecond),
-		"constant_capacity_5mbps_high_latency":     createVirtualNetwork(5_000_000, 80_000, 300*time.Millisecond),
+		"1mbps_very_low_latency": createVirtualNetwork(1_000_000, 80_000, 50*time.Millisecond),
+		"5mbps_very_low_latency": createVirtualNetwork(5_000_000, 80_000, 50*time.Millisecond),
+		"1mbps_low_latency":      createVirtualNetwork(1_000_000, 80_000, 50*time.Millisecond),
+		"5mbps_low_latency":      createVirtualNetwork(5_000_000, 80_000, 50*time.Millisecond),
+		"1mbps_medium_latency":   createVirtualNetwork(1_000_000, 80_000, 150*time.Millisecond),
+		"5mbps_medium_latency":   createVirtualNetwork(5_000_000, 80_000, 150*time.Millisecond),
+		"1mbps_high_latency":     createVirtualNetwork(1_000_000, 80_000, 300*time.Millisecond),
+		"5mbps_high_latency":     createVirtualNetwork(5_000_000, 80_000, 300*time.Millisecond),
 	}
-	for name, vnf := range networks {
-		t.Run(name, func(t *testing.T) {
-			synctest.Test(t, func(t *testing.T) {
-				t.Helper()
+	peerOptions := map[string]struct {
+		receiver []option
+		sender   []option
+	}{
+		"gcc-ccfb": {
+			receiver: []option{
+				registerCCFB(),
+			},
+			sender: []option{
+				registerPacer(),
+				initGCC(),
+			},
+		},
+		"gcc-twcc": {
+			receiver: []option{
+				registerTWCC(),
+			},
+			sender: []option{
+				registerPacer(),
+				registerTWCCHeaderExtension(),
+				initGCC(),
+			},
+		},
+	}
+	for netName, vnf := range networks {
+		for peerName, pos := range peerOptions {
+			t.Run(fmt.Sprintf("%v-%v", netName, peerName), func(t *testing.T) {
+				synctest.Test(t, func(t *testing.T) {
+					t.Helper()
 
-				logger, cleanup := testLogger(t)
-				defer cleanup()
+					logger, cleanup := testLogger(t)
+					defer cleanup()
 
-				onTrack := make(chan struct{})
-				connected := make(chan struct{})
-				done := make(chan struct{})
+					onTrack := make(chan struct{})
+					connected := make(chan struct{})
+					done := make(chan struct{})
 
-				network := vnf(t)
+					network := vnf(t)
 
-				receiver, err := newPeer(
-					registerDefaultCodecs(),
-					setVNet(network.left, []string{"10.0.1.1"}),
-					onRemoteTrack(func(track *webrtc.TrackRemote) {
-						close(onTrack)
-						go func() {
-							buf := make([]byte, 1500)
-							for {
-								select {
-								case <-done:
-									return
-								default:
-									_, _, err := track.Read(buf)
-									if errors.Is(err, io.EOF) {
+					receiverOptions := []option{
+						registerDefaultCodecs(),
+						setVNet(network.left, []string{"10.0.1.1"}),
+						onRemoteTrack(func(track *webrtc.TrackRemote) {
+							close(onTrack)
+							go func() {
+								buf := make([]byte, 1500)
+								for {
+									select {
+									case <-done:
 										return
+									default:
+										_, _, err := track.Read(buf)
+										if errors.Is(err, io.EOF) {
+											return
+										}
+										assert.NoError(t, err)
 									}
-									assert.NoError(t, err)
 								}
-							}
-						}()
-					}),
-					registerPacketLogger(logger.With("vantage-point", "receiver")),
-					registerCCFB(),
-				)
-				assert.NoError(t, err)
+							}()
+						}),
+						registerPacketLogger(logger.With("vantage-point", "receiver")),
+					}
+					receiverOptions = append(receiverOptions, pos.receiver...)
+					receiver, err := newPeer(receiverOptions...)
+					assert.NoError(t, err)
 
-				err = receiver.addRemoteTrack()
-				assert.NoError(t, err)
+					err = receiver.addRemoteTrack()
+					assert.NoError(t, err)
 
-				var codec *perfectCodec
-				sender, err := newPeer(
-					registerDefaultCodecs(),
-					onConnected(func() { close(connected) }),
-					setVNet(network.right, []string{"10.0.2.1"}),
-					registerPacketLogger(logger.With("vantage-point", "sender")),
-					registerRTPFB(),
-					registerPacer(),
-					initGCC(func(rate int) {
-						logger.Info("setting codec target bitrate", "rate", rate)
-						codec.setTargetBitrate(rate)
-					}),
-				)
-				assert.NoError(t, err)
+					var codec *perfectCodec
+					senderOptions := []option{
+						registerDefaultCodecs(),
+						onConnected(func() { close(connected) }),
+						setVNet(network.right, []string{"10.0.2.1"}),
+						registerPacketLogger(logger.With("vantage-point", "sender")),
+						registerRTPFB(),
+						setOnRateCallback(func(rate int) {
+							logger.Info("setting codec target bitrate", "rate", rate)
+							codec.setTargetBitrate(rate)
+						}),
+					}
+					senderOptions = append(senderOptions, pos.sender...)
+					sender, err := newPeer(senderOptions...)
+					assert.NoError(t, err)
 
-				track, err := sender.addLocalTrack()
-				assert.NoError(t, err)
+					track, err := sender.addLocalTrack()
+					assert.NoError(t, err)
 
-				codec = newPerfectCodec(track, 1_000_000)
-				go func() {
-					<-connected
-					codec.start()
-				}()
+					codec = newPerfectCodec(track, 1_000_000)
+					go func() {
+						<-connected
+						codec.start()
+					}()
 
-				offer, err := sender.createOffer()
-				assert.NoError(t, err)
+					offer, err := sender.createOffer()
+					assert.NoError(t, err)
 
-				err = receiver.setRemoteDescription(offer)
-				assert.NoError(t, err)
+					err = receiver.setRemoteDescription(offer)
+					assert.NoError(t, err)
 
-				answer, err := receiver.createAnswer()
-				assert.NoError(t, err)
+					answer, err := receiver.createAnswer()
+					assert.NoError(t, err)
 
-				err = sender.setRemoteDescription(answer)
-				assert.NoError(t, err)
+					err = sender.setRemoteDescription(answer)
+					assert.NoError(t, err)
 
-				synctest.Wait()
+					synctest.Wait()
 
-				select {
-				case <-onTrack:
-				case <-time.After(5 * time.Second):
-					assert.Fail(t, "on track not called")
-				}
+					select {
+					case <-onTrack:
+					case <-time.After(5 * time.Second):
+						assert.Fail(t, "on track not called")
+					}
 
-				time.Sleep(100 * time.Second)
-				close(done)
+					time.Sleep(100 * time.Second)
+					close(done)
 
-				err = codec.Close()
-				assert.NoError(t, err)
+					err = codec.Close()
+					assert.NoError(t, err)
 
-				err = sender.pc.Close()
-				assert.NoError(t, err)
+					err = sender.pc.Close()
+					assert.NoError(t, err)
 
-				err = receiver.pc.Close()
-				assert.NoError(t, err)
+					err = receiver.pc.Close()
+					assert.NoError(t, err)
 
-				err = network.Close()
-				assert.NoError(t, err)
+					err = network.Close()
+					assert.NoError(t, err)
 
-				synctest.Wait()
+					synctest.Wait()
+				})
 			})
-		})
+		}
 	}
 }
 
