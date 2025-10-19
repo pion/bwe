@@ -126,6 +126,7 @@ func TestBWE(t *testing.T) {
 					setVNet(network.right, []string{"10.0.2.1"}),
 					registerPacketLogger(logger.With("vantage-point", "sender")),
 					registerRTPFB(),
+					registerPacer(),
 					initGCC(func(rate int) {
 						logger.Info("setting codec target bitrate", "rate", rate)
 						codec.setTargetBitrate(rate)
