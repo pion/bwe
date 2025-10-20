@@ -3,7 +3,7 @@
 
 //go:build !js
 
-package simulation
+package bwe_test
 
 import (
 	"crypto/rand"
@@ -46,14 +46,16 @@ func newPerfectCodec(writer sampleWriter, targetBitrateBps int) *perfectCodec {
 }
 
 // setTargetBitrate sets the target bitrate to r bits per second.
-// func (c *perfectCodec) setTargetBitrate(r int) {
-// 	c.wg.Go(func() {
-// 		select {
-// 		case c.bitrateUpdateCh <- r:
-// 		case <-c.done:
-// 		}
-// 	})
-// }
+func (c *perfectCodec) setTargetBitrate(r int) {
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		select {
+		case c.bitrateUpdateCh <- r:
+		case <-c.done:
+		}
+	}()
+}
 
 // start begins the codec operation, generating frames at the configured frame rate.
 func (c *perfectCodec) start() {
