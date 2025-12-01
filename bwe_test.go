@@ -68,14 +68,16 @@ func TestMain(m *testing.M) {
 
 func TestBWE(t *testing.T) {
 	networks := map[string]vnetFactory{
-		"1mbps_very_low_latency": createVirtualNetwork(1_000_000, 80_000, 50*time.Millisecond),
-		"5mbps_very_low_latency": createVirtualNetwork(5_000_000, 80_000, 50*time.Millisecond),
-		"1mbps_low_latency":      createVirtualNetwork(1_000_000, 80_000, 50*time.Millisecond),
-		"5mbps_low_latency":      createVirtualNetwork(5_000_000, 80_000, 50*time.Millisecond),
-		"1mbps_medium_latency":   createVirtualNetwork(1_000_000, 80_000, 150*time.Millisecond),
-		"5mbps_medium_latency":   createVirtualNetwork(5_000_000, 80_000, 150*time.Millisecond),
-		"1mbps_high_latency":     createVirtualNetwork(1_000_000, 80_000, 300*time.Millisecond),
-		"5mbps_high_latency":     createVirtualNetwork(5_000_000, 80_000, 300*time.Millisecond),
+		"1mbps_1ms":   createVirtualNetwork(1_000_000, 80_000, 1*time.Millisecond),
+		"5mbps_1ms":   createVirtualNetwork(5_000_000, 80_000, 1*time.Millisecond),
+		"1mbps_10ms":  createVirtualNetwork(1_000_000, 80_000, 10*time.Millisecond),
+		"5mbps_10ms":  createVirtualNetwork(5_000_000, 80_000, 10*time.Millisecond),
+		"1mbps_50ms":  createVirtualNetwork(1_000_000, 80_000, 50*time.Millisecond),
+		"5mbps_50ms":  createVirtualNetwork(5_000_000, 80_000, 50*time.Millisecond),
+		"1mbps_150ms": createVirtualNetwork(1_000_000, 80_000, 150*time.Millisecond),
+		"5mbps_150ms": createVirtualNetwork(5_000_000, 80_000, 150*time.Millisecond),
+		"1mbps_300ms": createVirtualNetwork(1_000_000, 80_000, 300*time.Millisecond),
+		"5mbps_300ms": createVirtualNetwork(5_000_000, 80_000, 300*time.Millisecond),
 	}
 	peerOptions := map[string]struct {
 		receiver     []option
@@ -88,7 +90,6 @@ func TestBWE(t *testing.T) {
 				registerCCFB(),
 			},
 			sender: []option{
-				registerPacer(),
 				initGCC(),
 			},
 			codecMinRate: 0,
@@ -99,7 +100,6 @@ func TestBWE(t *testing.T) {
 				registerTWCC(),
 			},
 			sender: []option{
-				registerPacer(),
 				registerTWCCHeaderExtension(),
 				initGCC(),
 			},
@@ -111,7 +111,6 @@ func TestBWE(t *testing.T) {
 				registerCCFB(),
 			},
 			sender: []option{
-				registerPacer(),
 				initGCC(),
 			},
 			codecMinRate: 0,
@@ -122,14 +121,80 @@ func TestBWE(t *testing.T) {
 				registerTWCC(),
 			},
 			sender: []option{
+				registerTWCCHeaderExtension(),
+				initGCC(),
+			},
+			codecMinRate: 0,
+			codecMaxRate: 500_000,
+		},
+		"gcc-ccfb-applimited2": {
+			receiver: []option{
+				registerCCFB(),
+			},
+			sender: []option{
+				initGCC(),
+			},
+			codecMinRate: 0,
+			codecMaxRate: 1_500_000,
+		},
+		"gcc-twcc-applimited2": {
+			receiver: []option{
+				registerTWCC(),
+			},
+			sender: []option{
+				registerTWCCHeaderExtension(),
+				initGCC(),
+			},
+			codecMinRate: 0,
+			codecMaxRate: 1_500_00,
+		},
+		"gcc-ccfb-paced": {
+			receiver: []option{
+				registerCCFB(),
+			},
+			sender: []option{
+				registerPacer(),
+				initGCC(),
+			},
+			codecMinRate: 0,
+			codecMaxRate: math.MaxInt,
+		},
+		"gcc-twcc-paced": {
+			receiver: []option{
+				registerTWCC(),
+			},
+			sender: []option{
 				registerPacer(),
 				registerTWCCHeaderExtension(),
 				initGCC(),
 			},
 			codecMinRate: 0,
-			codecMaxRate: 500_00,
+			codecMaxRate: math.MaxInt,
 		},
-		"gcc-ccfb-applimited2": {
+		"gcc-ccfb-applimited1-paced": {
+			receiver: []option{
+				registerCCFB(),
+			},
+			sender: []option{
+				registerPacer(),
+				initGCC(),
+			},
+			codecMinRate: 0,
+			codecMaxRate: 500_000,
+		},
+		"gcc-twcc-applimited1-paced": {
+			receiver: []option{
+				registerTWCC(),
+			},
+			sender: []option{
+				registerPacer(),
+				registerTWCCHeaderExtension(),
+				initGCC(),
+			},
+			codecMinRate: 0,
+			codecMaxRate: 500_000,
+		},
+		"gcc-ccfb-applimited2-paced": {
 			receiver: []option{
 				registerCCFB(),
 			},
@@ -140,7 +205,7 @@ func TestBWE(t *testing.T) {
 			codecMinRate: 0,
 			codecMaxRate: 1_500_000,
 		},
-		"gcc-twcc-applimited2": {
+		"gcc-twcc-applimited2-paced": {
 			receiver: []option{
 				registerTWCC(),
 			},
