@@ -62,6 +62,7 @@ func createVirtualNetwork(rate, burst int, delay time.Duration) func(*testing.T)
 			leftRouter,
 			vnet.TBFRate(rate),
 			vnet.TBFMaxBurst(burst),
+			vnet.TBFQueueSizeInBytes(int(float64(rate)*delay.Seconds())),
 		)
 		assert.NoError(t, err)
 
@@ -90,6 +91,7 @@ func createVirtualNetwork(rate, burst int, delay time.Duration) func(*testing.T)
 			rightRouter,
 			vnet.TBFRate(rate),
 			vnet.TBFMaxBurst(burst),
+			vnet.TBFQueueSizeInBytes(int(float64(rate)*delay.Seconds())),
 		)
 		assert.NoError(t, err)
 
