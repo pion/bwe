@@ -25,6 +25,8 @@ type perfectCodec struct {
 
 	writer sampleWriter
 
+	minTargetRateBps int
+	maxTargetRateBps int
 	targetBitrateBps int
 	fps              int
 	bitrateUpdateCh  chan int
@@ -34,14 +36,17 @@ type perfectCodec struct {
 }
 
 // newPerfectCodec creates a new PerfectCodec with the specified frame writer and target bitrate.
-func newPerfectCodec(writer sampleWriter, targetBitrateBps int) *perfectCodec {
+func newPerfectCodec(writer sampleWriter, minTargetRateBps, maxTargetRateBps, initTargetBitrateBps int) *perfectCodec {
 	return &perfectCodec{
 		logger:           logging.NewDefaultLoggerFactory().NewLogger("perfect_codec"),
 		writer:           writer,
-		targetBitrateBps: targetBitrateBps,
+		minTargetRateBps: minTargetRateBps,
+		maxTargetRateBps: maxTargetRateBps,
+		targetBitrateBps: initTargetBitrateBps,
 		fps:              30,
 		bitrateUpdateCh:  make(chan int),
 		done:             make(chan struct{}),
+		wg:               sync.WaitGroup{},
 	}
 }
 
@@ -83,6 +88,8 @@ func (c *perfectCodec) start() {
 					continue
 				}
 			case nextRate := <-c.bitrateUpdateCh:
+				nextRate = max(nextRate, c.minTargetRateBps)
+				nextRate = min(nextRate, c.maxTargetRateBps)
 				c.targetBitrateBps = nextRate
 			case <-c.done:
 				return
