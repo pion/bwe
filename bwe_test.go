@@ -33,7 +33,7 @@ func TestMain(m *testing.M) {
 	if logDir == "" {
 		logDir = "test-web/logs"
 	}
-	if err := os.MkdirAll(logDir, 0o755); err != nil {
+	if err := os.MkdirAll(logDir, 0o750); err != nil {
 		log.Printf("failed to create log dir %q: %v", logDir, err)
 		os.Exit(1)
 	}
@@ -57,7 +57,7 @@ func TestMain(m *testing.M) {
 	}
 
 	indexPath := filepath.Join(logDir, "index.json")
-	if err := os.WriteFile(indexPath, b, 0644); err != nil {
+	if err := os.WriteFile(indexPath, b, 0600); err != nil {
 		log.Printf("Failed to write index.json: %v", err)
 	} else {
 		log.Printf("Generated index.json with %d files", len(names))
@@ -276,15 +276,15 @@ func testLogger(t *testing.T) (*slog.Logger, func()) {
 	filename := filepath.Join(logDir, fmt.Sprintf("%s.jsonl", name))
 	file, err := os.Create(filename)
 	if err != nil {
-		t.Fatalf("failed to create log file %q: %v", filename, err)
+		assert.Failf(t, "failed to create log file %q: %v", filename, err)
 	}
 
 	handler := slog.NewJSONHandler(file, &slog.HandlerOptions{Level: slog.LevelInfo})
 	logger := slog.New(handler)
 
 	cleanup := func() {
-		file.Sync()
-		file.Close()
+		assert.NoError(t, file.Sync())
+		assert.NoError(t, file.Close())
 	}
 
 	return logger, cleanup
