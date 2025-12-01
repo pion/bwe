@@ -12,6 +12,7 @@ import (
 	"io"
 	"log"
 	"log/slog"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,8 +78,10 @@ func TestBWE(t *testing.T) {
 		"5mbps_high_latency":     createVirtualNetwork(5_000_000, 80_000, 300*time.Millisecond),
 	}
 	peerOptions := map[string]struct {
-		receiver []option
-		sender   []option
+		receiver     []option
+		sender       []option
+		codecMinRate int
+		codecMaxRate int
 	}{
 		"gcc-ccfb": {
 			receiver: []option{
@@ -88,6 +91,8 @@ func TestBWE(t *testing.T) {
 				registerPacer(),
 				initGCC(),
 			},
+			codecMinRate: 0,
+			codecMaxRate: math.MaxInt,
 		},
 		"gcc-twcc": {
 			receiver: []option{
@@ -98,6 +103,54 @@ func TestBWE(t *testing.T) {
 				registerTWCCHeaderExtension(),
 				initGCC(),
 			},
+			codecMinRate: 0,
+			codecMaxRate: math.MaxInt,
+		},
+		"gcc-ccfb-applimited1": {
+			receiver: []option{
+				registerCCFB(),
+			},
+			sender: []option{
+				registerPacer(),
+				initGCC(),
+			},
+			codecMinRate: 0,
+			codecMaxRate: 500_000,
+		},
+		"gcc-twcc-applimited1": {
+			receiver: []option{
+				registerTWCC(),
+			},
+			sender: []option{
+				registerPacer(),
+				registerTWCCHeaderExtension(),
+				initGCC(),
+			},
+			codecMinRate: 0,
+			codecMaxRate: 500_00,
+		},
+		"gcc-ccfb-applimited2": {
+			receiver: []option{
+				registerCCFB(),
+			},
+			sender: []option{
+				registerPacer(),
+				initGCC(),
+			},
+			codecMinRate: 0,
+			codecMaxRate: 1_500_000,
+		},
+		"gcc-twcc-applimited2": {
+			receiver: []option{
+				registerTWCC(),
+			},
+			sender: []option{
+				registerPacer(),
+				registerTWCCHeaderExtension(),
+				initGCC(),
+			},
+			codecMinRate: 0,
+			codecMaxRate: 1_500_00,
 		},
 	}
 	for netName, vnf := range networks {
@@ -164,7 +217,12 @@ func TestBWE(t *testing.T) {
 					track, err := sender.addLocalTrack()
 					assert.NoError(t, err)
 
-					codec = newPerfectCodec(track, 1_000_000)
+					codec = newPerfectCodec(
+						track,
+						pos.codecMinRate,
+						pos.codecMaxRate,
+						1_000_000,
+					)
 					go func() {
 						<-connected
 						codec.start()
