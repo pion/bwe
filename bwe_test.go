@@ -68,16 +68,16 @@ func TestMain(m *testing.M) {
 
 func TestBWE(t *testing.T) {
 	networks := map[string]vnetFactory{
-		"1mbps_1ms":   createVirtualNetwork(1_000_000, 80_000, 1*time.Millisecond),
-		"5mbps_1ms":   createVirtualNetwork(5_000_000, 80_000, 1*time.Millisecond),
-		"1mbps_10ms":  createVirtualNetwork(1_000_000, 80_000, 10*time.Millisecond),
-		"5mbps_10ms":  createVirtualNetwork(5_000_000, 80_000, 10*time.Millisecond),
-		"1mbps_50ms":  createVirtualNetwork(1_000_000, 80_000, 50*time.Millisecond),
-		"5mbps_50ms":  createVirtualNetwork(5_000_000, 80_000, 50*time.Millisecond),
-		"1mbps_150ms": createVirtualNetwork(1_000_000, 80_000, 150*time.Millisecond),
-		"5mbps_150ms": createVirtualNetwork(5_000_000, 80_000, 150*time.Millisecond),
-		"1mbps_300ms": createVirtualNetwork(1_000_000, 80_000, 300*time.Millisecond),
-		"5mbps_300ms": createVirtualNetwork(5_000_000, 80_000, 300*time.Millisecond),
+		"1mbps-1ms":   createVirtualNetwork(1_000_000, 80_000, 1*time.Millisecond),
+		"5mbps-1ms":   createVirtualNetwork(5_000_000, 80_000, 1*time.Millisecond),
+		"1mbps-10ms":  createVirtualNetwork(1_000_000, 80_000, 10*time.Millisecond),
+		"5mbps-10ms":  createVirtualNetwork(5_000_000, 80_000, 10*time.Millisecond),
+		"1mbps-50ms":  createVirtualNetwork(1_000_000, 80_000, 50*time.Millisecond),
+		"5mbps-50ms":  createVirtualNetwork(5_000_000, 80_000, 50*time.Millisecond),
+		"1mbps-150ms": createVirtualNetwork(1_000_000, 80_000, 150*time.Millisecond),
+		"5mbps-150ms": createVirtualNetwork(5_000_000, 80_000, 150*time.Millisecond),
+		"1mbps-300ms": createVirtualNetwork(1_000_000, 80_000, 300*time.Millisecond),
+		"5mbps-300ms": createVirtualNetwork(5_000_000, 80_000, 300*time.Millisecond),
 	}
 	peerOptions := map[string]struct {
 		receiver     []option
