@@ -337,7 +337,11 @@ func TestBWE(t *testing.T) {
 
 func testLogger(t *testing.T) (*slog.Logger, func()) {
 	t.Helper()
-	name := strings.ReplaceAll(t.Name(), "/", "-")
+	name, ok := strings.CutPrefix(t.Name(), "TestBWE/")
+	if !ok {
+		assert.FailNow(t, "test case with invalid name tried to create logfile")
+	}
+	name = strings.ReplaceAll(name, "/", "-")
 	filename := filepath.Join(logDir, fmt.Sprintf("%s.jsonl", name))
 	file, err := os.Create(filename)
 	if err != nil {
@@ -347,9 +351,21 @@ func testLogger(t *testing.T) (*slog.Logger, func()) {
 	handler := slog.NewJSONHandler(file, &slog.HandlerOptions{Level: slog.LevelInfo})
 	logger := slog.New(handler)
 
+	// Also create a log file for stdout redirects to capture Pions builtin logs
+	stderrFileName := filepath.Join(logDir, fmt.Sprintf("%s.stderr", name))
+	stderrFile, err := os.Create(stderrFileName)
+	if err != nil {
+		assert.Failf(t, "failed to create stdout file %q: %v", filename, err)
+	}
+	old := os.Stderr
+	os.Stderr = stderrFile
+
 	cleanup := func() {
+		os.Stderr = old
 		assert.NoError(t, file.Sync())
 		assert.NoError(t, file.Close())
+		assert.NoError(t, stderrFile.Sync())
+		assert.NoError(t, stderrFile.Close())
 	}
 
 	return logger, cleanup
