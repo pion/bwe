@@ -37,6 +37,10 @@ func TestMain(m *testing.M) {
 		log.Printf("failed to create log dir %q: %v", logDir, err)
 		os.Exit(1)
 	}
+	if err := os.Setenv("PION_LOG_TRACE", "bwe_send_side_controller,bwe_delay_rate_controller,bwe_test_peer,perfect_codec"); err != nil {
+		log.Printf("failed to set pion logger environment variable")
+		os.Exit(1)
+	}
 
 	ec := m.Run()
 
