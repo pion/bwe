@@ -276,7 +276,7 @@ func TestBWE(t *testing.T) {
 						registerRTPFB(),
 						setOnRateCallback(func(rate int) {
 							logger.Info("setting codec target bitrate", "rate", rate)
-							codec.setTargetBitrate(rate)
+							codec.setTargetBitrate(int(0.9 * float64(rate)))
 						}),
 					}
 					senderOptions = append(senderOptions, pos.sender...)
