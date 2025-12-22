@@ -40,6 +40,9 @@ func createVirtualNetwork(rate, burst int, delay time.Duration) func(*testing.T)
 	return func(t *testing.T) *virtualNetwork {
 		t.Helper()
 
+		bdp := float64(rate) * delay.Seconds()
+		bottleneckQueueSize := int(max(bdp, 3000)) // allow at least two packets of MTU size 1500 in queue
+
 		wan, err := vnet.NewRouter(&vnet.RouterConfig{
 			CIDR:          "0.0.0.0/0",
 			LoggerFactory: logging.NewDefaultLoggerFactory(),
@@ -62,7 +65,7 @@ func createVirtualNetwork(rate, burst int, delay time.Duration) func(*testing.T)
 			leftRouter,
 			vnet.TBFRate(rate),
 			vnet.TBFMaxBurst(burst),
-			vnet.TBFQueueSizeInBytes(int(float64(rate)*delay.Seconds())),
+			vnet.TBFQueueSizeInBytes(bottleneckQueueSize),
 		)
 		assert.NoError(t, err)
 
@@ -91,7 +94,7 @@ func createVirtualNetwork(rate, burst int, delay time.Duration) func(*testing.T)
 			rightRouter,
 			vnet.TBFRate(rate),
 			vnet.TBFMaxBurst(burst),
-			vnet.TBFQueueSizeInBytes(int(float64(rate)*delay.Seconds())),
+			vnet.TBFQueueSizeInBytes(bottleneckQueueSize),
 		)
 		assert.NoError(t, err)
 
