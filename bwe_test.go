@@ -150,7 +150,7 @@ func TestBWE(t *testing.T) {
 				initGCC(),
 			},
 			codecMinRate: 0,
-			codecMaxRate: 1_500_00,
+			codecMaxRate: 1_500_000,
 		},
 		"gcc-ccfb-paced": {
 			receiver: []option{
@@ -219,7 +219,7 @@ func TestBWE(t *testing.T) {
 				initGCC(),
 			},
 			codecMinRate: 0,
-			codecMaxRate: 1_500_00,
+			codecMaxRate: 1_500_000,
 		},
 	}
 	for netName, vnf := range networks {
