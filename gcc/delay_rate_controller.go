@@ -65,7 +65,7 @@ func (c *delayRateController) onPacketAcked(sequenceNumber uint64, size int, dep
 	c.latestUsage = c.od.update(arrival, estimate, c.samples)
 	c.last = next
 	c.log.Tracef(
-		"ts=%v.%06d, seq=%v, size=%v, interArrivalTime=%v, interDepartureTime=%v, interGroupDelay=%v, estimate=%v, threshold=%v, usage=%v, state=%v", // nolint
+		"ts=%v.%06d, seq=%v, size=%v, interArrivalTime=%v, interDepartureTime=%v, interGroupDelay=%v, estimate=%f, threshold=%f, usage=%v, state=%v", // nolint
 		c.last[0].Departure.UTC().Format("2006/01/02 15:04:05"),
 		c.last[0].Departure.UTC().Nanosecond()/1e3,
 		next[0].SequenceNumber,
