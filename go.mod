@@ -6,7 +6,7 @@ require (
 	github.com/pion/interceptor v0.1.41-0.20250918133005-ab70b00249ad
 	github.com/pion/logging v0.2.4
 	github.com/pion/rtcp v1.2.16
-	github.com/pion/rtp v1.9.0
+	github.com/pion/rtp v1.10.0
 	github.com/pion/transport/v3 v3.1.1
 	github.com/pion/webrtc/v4 v4.1.4
 	github.com/stretchr/testify v1.11.1
