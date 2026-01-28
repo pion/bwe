@@ -7,6 +7,7 @@ package bwe_test
 
 import (
 	"log/slog"
+	"time"
 
 	"github.com/pion/bwe/gcc"
 	"github.com/pion/interceptor"
@@ -14,9 +15,15 @@ import (
 	"github.com/pion/interceptor/pkg/packetdump"
 	"github.com/pion/interceptor/pkg/rfc8888"
 	"github.com/pion/interceptor/pkg/rtpfb"
+	"github.com/pion/interceptor/pkg/twcc"
 	"github.com/pion/logging"
+	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/v4/vnet"
 	"github.com/pion/webrtc/v4"
+)
+
+const (
+	feedbackInterval = 20 * time.Millisecond
 )
 
 type option func(*peer) error
@@ -85,7 +92,27 @@ func registerRTPFB() option {
 
 func registerTWCC() option {
 	return func(p *peer) error {
-		return webrtc.ConfigureTWCCSender(p.mediaEngine, p.interceptorRegistry)
+		p.mediaEngine.RegisterFeedback(webrtc.RTCPFeedback{Type: webrtc.TypeRTCPFBTransportCC}, webrtc.RTPCodecTypeVideo)
+		if err := p.mediaEngine.RegisterHeaderExtension(
+			webrtc.RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, webrtc.RTPCodecTypeVideo,
+		); err != nil {
+			return err
+		}
+
+		p.mediaEngine.RegisterFeedback(webrtc.RTCPFeedback{Type: webrtc.TypeRTCPFBTransportCC}, webrtc.RTPCodecTypeAudio)
+		if err := p.mediaEngine.RegisterHeaderExtension(
+			webrtc.RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, webrtc.RTPCodecTypeAudio,
+		); err != nil {
+			return err
+		}
+
+		generator, err := twcc.NewSenderInterceptor(twcc.SendInterval(feedbackInterval))
+		if err != nil {
+			return err
+		}
+
+		p.interceptorRegistry.Add(generator)
+		return nil
 	}
 }
 
@@ -97,7 +124,7 @@ func registerTWCCHeaderExtension() option {
 
 func registerCCFB() option {
 	return func(p *peer) error {
-		ccfb, err := rfc8888.NewSenderInterceptor()
+		ccfb, err := rfc8888.NewSenderInterceptor(rfc8888.SendInterval(feedbackInterval))
 		if err != nil {
 			return err
 		}
