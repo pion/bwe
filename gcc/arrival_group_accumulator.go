@@ -30,7 +30,7 @@ func newArrivalGroupAccumulator() *arrivalGroupAccumulator {
 		log:              logging.NewDefaultLoggerFactory().NewLogger("bwe_arrival_group_accumulator"),
 		next:             make([]arrivalGroupItem, 0),
 		burstInterval:    5 * time.Millisecond,
-		maxBurstDuration: 100 * time.Millisecond,
+		maxBurstDuration: 5 * time.Millisecond,
 	}
 }
 
@@ -66,7 +66,8 @@ func (a *arrivalGroupAccumulator) onPacketAcked(
 	arrivalTimeDeltaFirst := arrival.Sub(a.next[0].Arrival)
 	propagationDelta := arrivalTimeDeltaFirst - sendTimeDelta
 
-	if propagationDelta < 0 && arrivalTimeDeltaLast <= a.burstInterval && arrivalTimeDeltaFirst < a.maxBurstDuration {
+	if propagationDelta < 0 && arrivalTimeDeltaFirst < a.maxBurstDuration {
+		a.log.Tracef("seq-nr=%v prop(=%v) is < 0 and arrivalTimeDeltaFirst < maxBurstDuration (arrivalTimeDeltaFirst=%v)", sequenceNumber, propagationDelta, arrivalTimeDeltaFirst)
 		a.next = append(a.next, arrivalGroupItem{
 			SequenceNumber: sequenceNumber,
 			Size:           size,
