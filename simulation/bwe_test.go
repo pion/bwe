@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
-//go:build !js && go1.25
+//go:build !js && go1.25 && simulation
 
-package bwe_test
+package simulation
 
 import (
 	"encoding/json"
@@ -31,7 +31,7 @@ type vnetFactory func(*testing.T) *virtualNetwork
 func TestMain(m *testing.M) {
 	logDir = os.Getenv("BWE_LOG_DIR")
 	if logDir == "" {
-		logDir = "test-web/logs"
+		logDir = "logs/"
 	}
 	if err := os.MkdirAll(logDir, 0o750); err != nil {
 		log.Printf("failed to create log dir %q: %v", logDir, err)
