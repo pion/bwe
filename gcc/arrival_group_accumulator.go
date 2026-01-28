@@ -5,8 +5,6 @@ package gcc
 
 import (
 	"time"
-
-	"github.com/pion/logging"
 )
 
 type arrivalGroupItem struct {
@@ -19,7 +17,6 @@ type arrivalGroupItem struct {
 type arrivalGroup []arrivalGroupItem
 
 type arrivalGroupAccumulator struct {
-	log              logging.LeveledLogger
 	next             arrivalGroup
 	burstInterval    time.Duration
 	maxBurstDuration time.Duration
@@ -27,7 +24,6 @@ type arrivalGroupAccumulator struct {
 
 func newArrivalGroupAccumulator() *arrivalGroupAccumulator {
 	return &arrivalGroupAccumulator{
-		log:              logging.NewDefaultLoggerFactory().NewLogger("bwe_arrival_group_accumulator"),
 		next:             make([]arrivalGroupItem, 0),
 		burstInterval:    5 * time.Millisecond,
 		maxBurstDuration: 5 * time.Millisecond,
@@ -62,12 +58,10 @@ func (a *arrivalGroupAccumulator) onPacketAcked(
 		return nil
 	}
 
-	arrivalTimeDeltaLast := arrival.Sub(a.next[len(a.next)-1].Arrival)
 	arrivalTimeDeltaFirst := arrival.Sub(a.next[0].Arrival)
 	propagationDelta := arrivalTimeDeltaFirst - sendTimeDelta
 
 	if propagationDelta < 0 && arrivalTimeDeltaFirst < a.maxBurstDuration {
-		a.log.Tracef("seq-nr=%v prop(=%v) is < 0 and arrivalTimeDeltaFirst < maxBurstDuration (arrivalTimeDeltaFirst=%v)", sequenceNumber, propagationDelta, arrivalTimeDeltaFirst)
 		a.next = append(a.next, arrivalGroupItem{
 			SequenceNumber: sequenceNumber,
 			Size:           size,
@@ -77,8 +71,6 @@ func (a *arrivalGroupAccumulator) onPacketAcked(
 
 		return nil
 	}
-
-	a.log.Tracef("sendTimeDelta=%v, propagationDelta=%v, arrivalTimeDeltaLast=%v, arrivalTimeDeltaFirst=%v", sendTimeDelta, propagationDelta, arrivalTimeDeltaLast, arrivalTimeDeltaFirst)
 
 	group := make(arrivalGroup, len(a.next))
 	copy(group, a.next)
