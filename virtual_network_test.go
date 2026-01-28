@@ -11,18 +11,18 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/v3/vnet"
+	"github.com/pion/transport/v4/vnet"
 	"github.com/stretchr/testify/assert"
 )
 
 type virtualNetwork struct {
 	wan       *vnet.Router
 	left      *vnet.Net
-	leftTBF   *vnet.TokenBucketFilter
+	leftTBF   *vnet.Queue
 	leftDelay *vnet.DelayFilter
 
 	right      *vnet.Net
-	rightTBF   *vnet.TokenBucketFilter
+	rightTBF   *vnet.Queue
 	rightDelay *vnet.DelayFilter
 }
 
@@ -61,15 +61,13 @@ func createVirtualNetwork(rate, burst int, delay time.Duration) func(*testing.T)
 		})
 		assert.NoError(t, err)
 
-		leftTBF, err := vnet.NewTokenBucketFilter(
+		leftTBF, err := vnet.NewQueue(
 			leftRouter,
-			vnet.TBFRate(rate),
-			vnet.TBFMaxBurst(burst),
-			vnet.TBFQueueSizeInBytes(bottleneckQueueSize),
+			vnet.NewTBFQueue(rate, burst, int64(bottleneckQueueSize)),
 		)
 		assert.NoError(t, err)
 
-		leftDelay, err := vnet.NewDelayFilter(leftTBF, delay)
+		leftDelay, err := vnet.NewDelayFilter(leftTBF, vnet.WithDelay(delay))
 		assert.NoError(t, err)
 
 		err = wan.AddNet(leftDelay)
@@ -90,15 +88,13 @@ func createVirtualNetwork(rate, burst int, delay time.Duration) func(*testing.T)
 		})
 		assert.NoError(t, err)
 
-		rightTBF, err := vnet.NewTokenBucketFilter(
+		rightTBF, err := vnet.NewQueue(
 			rightRouter,
-			vnet.TBFRate(rate),
-			vnet.TBFMaxBurst(burst),
-			vnet.TBFQueueSizeInBytes(bottleneckQueueSize),
+			vnet.NewTBFQueue(rate, burst, int64(bottleneckQueueSize)),
 		)
 		assert.NoError(t, err)
 
-		rightDelay, err := vnet.NewDelayFilter(rightTBF, delay)
+		rightDelay, err := vnet.NewDelayFilter(rightTBF, vnet.WithDelay(delay))
 		assert.NoError(t, err)
 
 		err = wan.AddNet(rightDelay)
@@ -112,7 +108,6 @@ func createVirtualNetwork(rate, burst int, delay time.Duration) func(*testing.T)
 
 		leftNet, err := vnet.NewNet(&vnet.NetConfig{
 			StaticIPs: []string{"10.0.1.101"},
-			StaticIP:  "",
 		})
 		assert.NoError(t, err)
 		err = leftRouter.AddNet(leftNet)
@@ -120,7 +115,6 @@ func createVirtualNetwork(rate, burst int, delay time.Duration) func(*testing.T)
 
 		rightNet, err := vnet.NewNet(&vnet.NetConfig{
 			StaticIPs: []string{"10.0.2.101"},
-			StaticIP:  "",
 		})
 		assert.NoError(t, err)
 		err = rightRouter.AddNet(rightNet)
