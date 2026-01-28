@@ -110,7 +110,7 @@ func TestBWE(t *testing.T) {
 			codecMinRate: 0,
 			codecMaxRate: math.MaxInt,
 		},
-		"gcc-ccfb-applimited1": {
+		"gcc-ccfb-applimited500": {
 			receiver: []option{
 				registerCCFB(),
 			},
@@ -120,7 +120,7 @@ func TestBWE(t *testing.T) {
 			codecMinRate: 0,
 			codecMaxRate: 500_000,
 		},
-		"gcc-twcc-applimited1": {
+		"gcc-twcc-applimited500": {
 			receiver: []option{
 				registerTWCC(),
 			},
@@ -131,7 +131,7 @@ func TestBWE(t *testing.T) {
 			codecMinRate: 0,
 			codecMaxRate: 500_000,
 		},
-		"gcc-ccfb-applimited2": {
+		"gcc-ccfb-applimited1500": {
 			receiver: []option{
 				registerCCFB(),
 			},
@@ -141,7 +141,7 @@ func TestBWE(t *testing.T) {
 			codecMinRate: 0,
 			codecMaxRate: 1_500_000,
 		},
-		"gcc-twcc-applimited2": {
+		"gcc-twcc-applimited1500": {
 			receiver: []option{
 				registerTWCC(),
 			},
@@ -175,7 +175,7 @@ func TestBWE(t *testing.T) {
 			codecMinRate: 0,
 			codecMaxRate: math.MaxInt,
 		},
-		"gcc-ccfb-applimited1-paced": {
+		"gcc-ccfb-applimited500-paced": {
 			receiver: []option{
 				registerCCFB(),
 			},
@@ -186,7 +186,7 @@ func TestBWE(t *testing.T) {
 			codecMinRate: 0,
 			codecMaxRate: 500_000,
 		},
-		"gcc-twcc-applimited1-paced": {
+		"gcc-twcc-applimited500-paced": {
 			receiver: []option{
 				registerTWCC(),
 			},
@@ -198,7 +198,7 @@ func TestBWE(t *testing.T) {
 			codecMinRate: 0,
 			codecMaxRate: 500_000,
 		},
-		"gcc-ccfb-applimited2-paced": {
+		"gcc-ccfb-applimited1500-paced": {
 			receiver: []option{
 				registerCCFB(),
 			},
@@ -209,7 +209,7 @@ func TestBWE(t *testing.T) {
 			codecMinRate: 0,
 			codecMaxRate: 1_500_000,
 		},
-		"gcc-twcc-applimited2-paced": {
+		"gcc-twcc-applimited1500-paced": {
 			receiver: []option{
 				registerTWCC(),
 			},
