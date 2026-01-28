@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2025 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
-//go:build !js && go1.25
+//go:build !js && go1.25 && simulation
 
-package bwe_test
+package simulation
 
 import (
 	"errors"
