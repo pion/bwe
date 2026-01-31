@@ -79,7 +79,6 @@ func (c *SendSideController) OnFeedback(ts time.Time, rtt time.Duration) int {
 	lossTarget := c.lrc.update(delivered)
 	delayTarget := c.drc.update(ts, delivered, rtt)
 	c.targetRate = min(lossTarget, delayTarget)
-	c.log.Tracef("rttduration=%v", rtt)
 	c.log.Tracef(
 		"rtt=%v, delivered=%v, lossTarget=%v, delayTarget=%v, target=%v",
 		rtt.Nanoseconds(),
