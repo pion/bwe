@@ -12,11 +12,11 @@ import (
 // Option is a functional option for a SendSideController.
 type Option func(*SendSideController) error
 
-// Logger configures a custom logger for a SendSideController.
-func Logger(l logging.LeveledLogger) Option {
+// WithLoggerFactory configures a custom logger factory for a
+// SendSideController.
+func WithLoggerFactory(lf logging.LoggerFactory) Option {
 	return func(ssc *SendSideController) error {
-		ssc.log = l
-		ssc.drc.log = l
+		ssc.logFactory = lf
 
 		return nil
 	}
@@ -24,6 +24,7 @@ func Logger(l logging.LeveledLogger) Option {
 
 // SendSideController is a sender side congestion controller.
 type SendSideController struct {
+	logFactory logging.LoggerFactory
 	log        logging.LeveledLogger
 	dre        *deliveryRateEstimator
 	lrc        *lossRateController
@@ -35,10 +36,9 @@ type SendSideController struct {
 // max rates.
 func NewSendSideController(initialRate, minRate, maxRate int, opts ...Option) (*SendSideController, error) {
 	ssc := &SendSideController{
-		log:        logging.NewDefaultLoggerFactory().NewLogger("bwe_send_side_controller"),
+		logFactory: logging.NewDefaultLoggerFactory(),
 		dre:        newDeliveryRateEstimator(time.Second),
 		lrc:        newLossRateController(initialRate, minRate, maxRate),
-		drc:        newDelayRateController(initialRate),
 		targetRate: initialRate,
 	}
 	for _, opt := range opts {
@@ -46,6 +46,8 @@ func NewSendSideController(initialRate, minRate, maxRate int, opts ...Option) (*
 			return nil, err
 		}
 	}
+	ssc.log = ssc.logFactory.NewLogger("bwe_send_side_controller")
+	ssc.drc = newDelayRateController(initialRate, ssc.logFactory.NewLogger("bwe_delay_rate_controller"))
 
 	return ssc, nil
 }
