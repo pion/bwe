@@ -3,7 +3,7 @@ module github.com/pion/bwe
 go 1.24
 
 require (
-	github.com/pion/interceptor v0.1.41-0.20250918133005-ab70b00249ad
+	github.com/pion/interceptor v0.1.44
 	github.com/pion/logging v0.2.4
 	github.com/pion/rtcp v1.2.16
 	github.com/pion/rtp v1.10.1
