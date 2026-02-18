@@ -136,7 +136,7 @@ func registerCCFB() option {
 
 func initGCC() option {
 	return func(p *peer) (err error) {
-		p.estimator, err = gcc.NewSendSideController(1_000_000, 128_000, 50_000_000)
+		p.estimator, err = gcc.NewSendSideController(500_000, 128_000, 50_000_000)
 		if err != nil {
 			return err
 		}
