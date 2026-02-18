@@ -22,8 +22,8 @@ type trendlineEstimator struct {
 
 func newTrendlineEstimator() *trendlineEstimator {
 	return &trendlineEstimator{
-		smoothingCoeff:   0.9,
-		windowSize:       20,
+		smoothingCoeff:   0.8,
+		windowSize:       10,
 		firstArrival:     time.Time{},
 		accumulatedDelay: 0,
 		smoothedDelay:    0,

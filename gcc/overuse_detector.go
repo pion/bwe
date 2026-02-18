@@ -31,8 +31,8 @@ func newOveruseDetector(adaptive bool) *overuseDetector {
 	return &overuseDetector{
 		adaptiveThreshold:    adaptive,
 		thresholdGain:        4.0,
-		overUseTimeThreshold: 10 * time.Millisecond,
-		delayThreshold:       12.5,
+		overUseTimeThreshold: 5 * time.Millisecond,
+		delayThreshold:       6,
 		lastEstimate:         0,
 		lastUpdate:           time.Time{},
 		firstOverUse:         time.Time{},
@@ -42,6 +42,9 @@ func newOveruseDetector(adaptive bool) *overuseDetector {
 }
 
 func (d *overuseDetector) update(ts time.Time, trend float64, numDeltas int) usage {
+	if d.lastUpdate.IsZero() {
+		d.lastUpdate = ts
+	}
 	if numDeltas < 2 {
 		return usageNormal
 	}
@@ -51,7 +54,8 @@ func (d *overuseDetector) update(ts time.Time, trend float64, numDeltas int) usa
 	case modifiedTrend > d.delayThreshold:
 		if d.firstOverUse.IsZero() {
 			// TODO: Set firstOverUse to the average of now and last.
-			d.firstOverUse = ts
+			delta := ts.Sub(d.lastUpdate)
+			d.firstOverUse = ts.Add(-delta / 2)
 		}
 		if ts.Sub(d.firstOverUse) > d.overUseTimeThreshold {
 			d.firstOverUse = time.Time{}
@@ -68,16 +72,13 @@ func (d *overuseDetector) update(ts time.Time, trend float64, numDeltas int) usa
 		d.adaptThreshold(ts, modifiedTrend)
 	}
 
+	d.lastUpdate = ts
 	return d.lastUsage
 }
 
 func (d *overuseDetector) adaptThreshold(ts time.Time, modifiedTrend float64) {
-	if d.lastUpdate.IsZero() {
-		d.lastUpdate = ts
-	}
 	if math.Abs(modifiedTrend) > d.delayThreshold+15 {
 		d.lastUpdate = ts
-
 		return
 	}
 	k := kU
@@ -87,5 +88,4 @@ func (d *overuseDetector) adaptThreshold(ts time.Time, modifiedTrend float64) {
 	delta := min(ts.Sub(d.lastUpdate), 100*time.Millisecond)
 	d.delayThreshold += k * (math.Abs(modifiedTrend) - d.delayThreshold) * float64(delta.Milliseconds())
 	d.delayThreshold = max(min(d.delayThreshold, 600.0), 6.0)
-	d.lastUpdate = ts
 }

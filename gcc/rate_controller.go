@@ -21,9 +21,14 @@ func newRateController(initialRate int) *rateController {
 	return &rateController{
 		s:              stateIncrease,
 		rate:           initialRate,
-		decreaseFactor: 0.85,
+		decreaseFactor: 0.95,
 		lastUpdate:     time.Time{},
-		lastDecrease:   &exponentialMovingAverage{},
+		lastDecrease: &exponentialMovingAverage{
+			initialized: false,
+			alpha:       0.95,
+			average:     0,
+			variance:    0,
+		},
 	}
 }
 
