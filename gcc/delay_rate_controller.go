@@ -14,6 +14,7 @@ type delayRateController struct {
 	aga         *arrivalGroupAccumulator
 	last        arrivalGroup
 	kf          *kalmanFilter
+	te          *trendlineEstimator
 	od          *overuseDetector
 	rc          *rateController
 	latestUsage usage
@@ -26,7 +27,8 @@ func newDelayRateController(initialRate int, logger logging.LeveledLogger) *dela
 		aga:         newArrivalGroupAccumulator(),
 		last:        []arrivalGroupItem{},
 		kf:          newKalmanFilter(),
-		od:          newOveruseDetector(true),
+		te:          newTrendlineEstimator(),
+		od:          newOveruseDetector(false),
 		rc:          newRateController(initialRate),
 		latestUsage: 0,
 		samples:     0,
@@ -53,16 +55,19 @@ func (c *delayRateController) onPacketAcked(sequenceNumber uint64, size int, dep
 		return
 	}
 
-	prevSize := groupSize(c.last)
+	// prevSize := groupSize(c.last)
 	nextSize := groupSize(next)
-	sizeDelta := nextSize - prevSize
+	// sizeDelta := nextSize - prevSize
 
 	interArrivalTime := next[len(next)-1].Arrival.Sub(c.last[len(c.last)-1].Arrival)
 	interDepartureTime := next[len(next)-1].Departure.Sub(c.last[len(c.last)-1].Departure)
 	interGroupDelay := interArrivalTime - interDepartureTime
-	estimate := c.kf.update(float64(interGroupDelay.Milliseconds()), float64(sizeDelta))
+
+	// estimate := c.kf.update(float64(interGroupDelay.Milliseconds()), float64(sizeDelta))
+	trend := c.te.update(arrival, interGroupDelay)
+
 	c.samples++
-	c.latestUsage = c.od.update(arrival, estimate, c.samples)
+	c.latestUsage = c.od.update(arrival, trend, c.samples)
 	c.last = next
 	c.log.Tracef(
 		"ts=%v.%06d, seq=%v, size=%v, interArrivalTime=%v, interDepartureTime=%v, interGroupDelay=%v, estimate=%f, threshold=%f, usage=%v, state=%v", // nolint
@@ -73,7 +78,7 @@ func (c *delayRateController) onPacketAcked(sequenceNumber uint64, size int, dep
 		interArrivalTime.Microseconds(),
 		interDepartureTime.Microseconds(),
 		interGroupDelay.Microseconds(),
-		estimate,
+		trend,
 		c.od.delayThreshold,
 		int(c.latestUsage),
 		int(c.rc.s),

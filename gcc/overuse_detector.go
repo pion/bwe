@@ -12,11 +12,12 @@ const (
 	kU = 0.01
 	kD = 0.00018
 
-	maxNumDeltas = 60
+	minNumDeltas = 60
 )
 
 type overuseDetector struct {
 	adaptiveThreshold    bool
+	thresholdGain        float64
 	overUseTimeThreshold time.Duration
 	delayThreshold       float64
 	lastEstimate         time.Duration
@@ -29,12 +30,14 @@ type overuseDetector struct {
 func newOveruseDetector(adaptive bool) *overuseDetector {
 	return &overuseDetector{
 		adaptiveThreshold:    adaptive,
+		thresholdGain:        4.0,
 		overUseTimeThreshold: 10 * time.Millisecond,
 		delayThreshold:       12.5,
 		lastEstimate:         0,
 		lastUpdate:           time.Time{},
 		firstOverUse:         time.Time{},
 		inOveruse:            false,
+		lastUsage:            0,
 	}
 }
 
@@ -42,11 +45,12 @@ func (d *overuseDetector) update(ts time.Time, trend float64, numDeltas int) usa
 	if numDeltas < 2 {
 		return usageNormal
 	}
-	modifiedTrend := float64(min(numDeltas, maxNumDeltas)) * trend
+	modifiedTrend := float64(min(numDeltas, minNumDeltas)) * trend * d.thresholdGain
 
 	switch {
 	case modifiedTrend > d.delayThreshold:
 		if d.firstOverUse.IsZero() {
+			// TODO: Set firstOverUse to the average of now and last.
 			d.firstOverUse = ts
 		}
 		if ts.Sub(d.firstOverUse) > d.overUseTimeThreshold {
