@@ -30,6 +30,10 @@ func newLossRateController(initialRate, minRate, maxRate int) *lossRateControlle
 	}
 }
 
+func (l *lossRateController) setTargetRate(rate int) {
+	l.bitrate = min(max(rate, int(l.min)), int(l.max))
+}
+
 func (l *lossRateController) onPacketAcked() {
 	l.packetsSinceLastUpdate++
 }
