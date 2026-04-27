@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
-//go:build !js
-
 package simulation
 
 import (
@@ -25,47 +23,58 @@ type perfectCodec struct {
 
 	writer sampleWriter
 
-	targetBitrateBps int
+	minTargetRateBps int
+	maxTargetRateBps int
 	fps              int
-	bitrateUpdateCh  chan int
+
+	mu               sync.Mutex
+	targetBitrateBps int
 
 	done chan struct{}
 	wg   sync.WaitGroup
 }
 
 // newPerfectCodec creates a new PerfectCodec with the specified frame writer and target bitrate.
-func newPerfectCodec(writer sampleWriter, targetBitrateBps int) *perfectCodec {
+func newPerfectCodec(writer sampleWriter, minTargetRateBps, maxTargetRateBps, initTargetBitrateBps int) *perfectCodec {
 	return &perfectCodec{
 		logger:           logging.NewDefaultLoggerFactory().NewLogger("perfect_codec"),
 		writer:           writer,
-		targetBitrateBps: targetBitrateBps,
+		minTargetRateBps: minTargetRateBps,
+		maxTargetRateBps: maxTargetRateBps,
 		fps:              30,
-		bitrateUpdateCh:  make(chan int),
+		mu:               sync.Mutex{},
+		targetBitrateBps: initTargetBitrateBps,
 		done:             make(chan struct{}),
+		wg:               sync.WaitGroup{},
 	}
 }
 
-// setTargetBitrate sets the target bitrate to r bits per second.
-// func (c *perfectCodec) setTargetBitrate(r int) {
-// 	c.wg.Go(func() {
-// 		select {
-// 		case c.bitrateUpdateCh <- r:
-// 		case <-c.done:
-// 		}
-// 	})
-// }
+func (c *perfectCodec) setTargetBitrate(r int) {
+	r = max(r, c.minTargetRateBps)
+	r = min(r, c.maxTargetRateBps)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.targetBitrateBps = r
+}
+
+func (c *perfectCodec) targetBitrate() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.targetBitrateBps
+}
 
 // start begins the codec operation, generating frames at the configured frame rate.
 func (c *perfectCodec) start() {
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
+	c.wg.Go(func() {
 		msToNextFrame := time.Duration((1.0/float64(c.fps))*1000.0) * time.Millisecond
 		ticker := time.NewTicker(msToNextFrame)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
-				size := c.targetBitrateBps / (8.0 * c.fps)
+				size := c.targetBitrate() / (8.0 * c.fps)
 				buf := make([]byte, size)
 				if _, err := rand.Read(buf); err != nil {
 					c.logger.Errorf("failed to read random bytes: %v", err)
@@ -80,13 +89,11 @@ func (c *perfectCodec) start() {
 
 					continue
 				}
-			case nextRate := <-c.bitrateUpdateCh:
-				c.targetBitrateBps = nextRate
 			case <-c.done:
 				return
 			}
 		}
-	}()
+	})
 }
 
 // Close stops the codec and cleans up resources.
