@@ -47,7 +47,7 @@ func TestTrendlineEstimator(t *testing.T) {
 			},
 		},
 		{
-			name:           "multiple_values",
+			name:           "multiple_values_no_smoothing",
 			smoothingCoeff: 0, // no smoothing
 			windowSize:     10,
 			values: []value{
@@ -64,7 +64,7 @@ func TestTrendlineEstimator(t *testing.T) {
 			},
 		},
 		{
-			name:           "multiple_values",
+			name:           "multiple_values_with_smoothing",
 			smoothingCoeff: 0.8,
 			windowSize:     10,
 			values: []value{
@@ -77,6 +77,30 @@ func TestTrendlineEstimator(t *testing.T) {
 					arrivalTime:     time.Time{}.Add(2 * time.Second),
 					interGroupDelay: time.Second,
 					expectedTrend:   0.2,
+				},
+			},
+		},
+		{
+			// Inter group delays are usually well below a millisecond, so the
+			// estimator must not truncate them away.
+			name:           "sub_millisecond_delays",
+			smoothingCoeff: 0, // no smoothing
+			windowSize:     10,
+			values: []value{
+				{
+					arrivalTime:     time.Time{}.Add(time.Second),
+					interGroupDelay: 300 * time.Microsecond,
+					expectedTrend:   0,
+				},
+				{
+					arrivalTime:     time.Time{}.Add(time.Second + 5*time.Millisecond),
+					interGroupDelay: 300 * time.Microsecond,
+					expectedTrend:   0.06,
+				},
+				{
+					arrivalTime:     time.Time{}.Add(time.Second + 10*time.Millisecond),
+					interGroupDelay: 300 * time.Microsecond,
+					expectedTrend:   0.06,
 				},
 			},
 		},
