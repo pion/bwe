@@ -56,15 +56,14 @@ func newTrendlineEstimator(options ...trendlineEstimtatorOption) *trendlineEstim
 func (e *trendlineEstimator) update(arrivalTime time.Time, interGroupDelay time.Duration) float64 {
 	e.accumulatedDelay += interGroupDelay
 	e.smoothedDelayMs = e.smoothingCoeff*e.smoothedDelayMs +
-		(1-e.smoothingCoeff)*float64(e.accumulatedDelay.Milliseconds())
+		(1-e.smoothingCoeff)*durationToMs(e.accumulatedDelay)
 
 	if e.firstArrival.IsZero() {
 		e.firstArrival = arrivalTime
 	}
 
-	timeSinceFirst := arrivalTime.Sub(e.firstArrival).Milliseconds()
 	e.history = append(e.history, packetDelay{
-		arrivalTimeMS:   float64(timeSinceFirst),
+		arrivalTimeMS:   durationToMs(arrivalTime.Sub(e.firstArrival)),
 		smoothedDelayMS: e.smoothedDelayMs,
 	})
 	if len(e.history) > e.windowSize {
@@ -105,4 +104,9 @@ func fitSlope(packets []packetDelay) (float64, bool) {
 	}
 
 	return numerator / denominator, true
+}
+
+// durationToMs converts d to milliseconds as float64.
+func durationToMs(d time.Duration) float64 {
+	return float64(d.Microseconds()) / 1000.0
 }
