@@ -8,7 +8,6 @@ type lossRateController struct {
 	min, max float64
 
 	packetsSinceLastUpdate int
-	arrivedSinceLastUpdate int
 	lostSinceLastUpdate    int
 }
 
@@ -18,14 +17,12 @@ func newLossRateController(initialRate, minRate, maxRate int) *lossRateControlle
 		min:                    float64(minRate),
 		max:                    float64(maxRate),
 		packetsSinceLastUpdate: 0,
-		arrivedSinceLastUpdate: 0,
 		lostSinceLastUpdate:    0,
 	}
 }
 
 func (l *lossRateController) onPacketAcked() {
 	l.packetsSinceLastUpdate++
-	l.arrivedSinceLastUpdate++
 }
 
 func (l *lossRateController) onPacketLost() {
@@ -34,6 +31,10 @@ func (l *lossRateController) onPacketLost() {
 }
 
 func (l *lossRateController) update(lastDeliveryRate int) int {
+	// Without any reported packets there is no loss rate to act on.
+	if l.packetsSinceLastUpdate == 0 {
+		return l.bitrate
+	}
 	lossRate := float64(l.lostSinceLastUpdate) / float64(l.packetsSinceLastUpdate)
 	var target float64
 	if lossRate > 0.1 {
@@ -56,7 +57,6 @@ func (l *lossRateController) update(lastDeliveryRate int) int {
 	}
 
 	l.packetsSinceLastUpdate = 0
-	l.arrivedSinceLastUpdate = 0
 	l.lostSinceLastUpdate = 0
 
 	return l.bitrate
