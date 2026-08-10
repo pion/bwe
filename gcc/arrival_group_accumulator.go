@@ -72,8 +72,7 @@ func (a *arrivalGroupAccumulator) onPacketAcked(
 		return nil
 	}
 
-	group := make(arrivalGroup, len(a.next))
-	copy(group, a.next)
+	group := a.next
 	a.next = arrivalGroup{arrivalGroupItem{
 		SequenceNumber: sequenceNumber,
 		Size:           size,
