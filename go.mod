@@ -9,7 +9,7 @@ require (
 	github.com/pion/rtp v1.10.5
 	github.com/pion/transport/v3 v3.1.1
 	github.com/pion/webrtc/v4 v4.1.4
-	github.com/stretchr/testify v1.12.0
+	github.com/stretchr/testify v1.12.1
 )
 
 require (
@@ -25,8 +25,8 @@ require (
 	github.com/pion/stun/v3 v3.0.0 // indirect
 	github.com/pion/turn/v4 v4.1.1 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.33.0 // indirect
 	golang.org/x/net v0.35.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
