@@ -3,10 +3,18 @@
 
 package gcc
 
+import "time"
+
+const (
+	minLossWindow  = 200 * time.Millisecond
+	minLossPackets = 20
+)
+
 type lossRateController struct {
 	bitrate  int
 	min, max float64
 
+	windowStart            time.Time
 	packetsSinceLastUpdate int
 	lostSinceLastUpdate    int
 }
@@ -16,6 +24,7 @@ func newLossRateController(initialRate, minRate, maxRate int) *lossRateControlle
 		bitrate:                initialRate,
 		min:                    float64(minRate),
 		max:                    float64(maxRate),
+		windowStart:            time.Time{},
 		packetsSinceLastUpdate: 0,
 		lostSinceLastUpdate:    0,
 	}
@@ -30,12 +39,27 @@ func (l *lossRateController) onPacketLost() {
 	l.lostSinceLastUpdate++
 }
 
-func (l *lossRateController) update(lastDeliveryRate int) int {
-	// Without any reported packets there is no loss rate to act on.
+func (l *lossRateController) lossRate() float64 {
 	if l.packetsSinceLastUpdate == 0 {
-		return l.bitrate
+		return 0
 	}
-	lossRate := float64(l.lostSinceLastUpdate) / float64(l.packetsSinceLastUpdate)
+
+	return float64(l.lostSinceLastUpdate) / float64(l.packetsSinceLastUpdate)
+}
+
+func (l *lossRateController) windowClosed(ts time.Time, rtt time.Duration) bool {
+	return ts.Sub(l.windowStart) >= max(minLossWindow, rtt) &&
+		l.packetsSinceLastUpdate >= minLossPackets
+}
+
+func (l *lossRateController) update(ts time.Time, rtt time.Duration, lastDeliveryRate int) (int, bool) {
+	if l.windowStart.IsZero() {
+		l.windowStart = ts
+	}
+	if !l.windowClosed(ts, rtt) {
+		return l.bitrate, false
+	}
+	lossRate := l.lossRate()
 	var target float64
 	if lossRate > 0.1 {
 		target = float64(l.bitrate) * (1 - 0.5*lossRate)
@@ -56,8 +80,9 @@ func (l *lossRateController) update(lastDeliveryRate int) int {
 		l.bitrate = int(target)
 	}
 
+	l.windowStart = ts
 	l.packetsSinceLastUpdate = 0
 	l.lostSinceLastUpdate = 0
 
-	return l.bitrate
+	return l.bitrate, true
 }
