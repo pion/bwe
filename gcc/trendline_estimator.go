@@ -79,6 +79,10 @@ func (e *trendlineEstimator) update(arrivalTime time.Time, interGroupDelay time.
 }
 
 func fitSlope(packets []packetDelay) (float64, bool) {
+	if len(packets) < 2 {
+		return 0, false
+	}
+
 	sumX := 0.0
 	sumY := 0.0
 
