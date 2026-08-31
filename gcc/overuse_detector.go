@@ -10,19 +10,29 @@ import (
 
 const (
 	defaultOveruseTimeThreshold = 5 * time.Millisecond
-	defaultDelayThreshold       = 1.5
+	defaultDelayThreshold       = 12.5
 	defaultThresholdGain        = 4.0
+	defaultKUp                  = 0.0087
+	defaultKDown                = 0.039
 	minNumDeltas                = 60
+	maxAdaptOffset              = 15.0
+	maxThresholdUpdateDelta     = 100 * time.Millisecond
+	minDelayThreshold           = 6.0
+	maxDelayThreshold           = 600.0
 )
 
 type overuseDetector struct {
 	overuseTimeThreshold time.Duration
 	delayThreshold       float64
 	thresholdGain        float64
+	kUp                  float64
+	kDown                float64
 	timeOverusing        time.Duration
 	overusing            bool
 	overuseCounter       int
 	previousTrend        float64
+	lastUpdate           time.Time
+	hasLastUpdate        bool
 	usage                usage
 }
 
@@ -31,17 +41,27 @@ func newOveruseDetector() *overuseDetector {
 		overuseTimeThreshold: defaultOveruseTimeThreshold,
 		delayThreshold:       defaultDelayThreshold,
 		thresholdGain:        defaultThresholdGain,
+		kUp:                  defaultKUp,
+		kDown:                defaultKDown,
 		timeOverusing:        0,
 		overusing:            false,
 		overuseCounter:       0,
 		previousTrend:        0,
+		lastUpdate:           time.Time{},
+		hasLastUpdate:        false,
 		usage:                usageNormal,
 	}
 }
 
-// update processes a trend estimate, where sendDelta is the departure time
-// difference between the two most recent arrival groups.
-func (d *overuseDetector) update(sendDelta time.Duration, trend float64, numDeltas int) usage {
+// update processes a trend estimate, where arrivalTime is the arrival time of
+// the most recent group and sendDelta is the departure time difference between
+// the two most recent arrival groups.
+func (d *overuseDetector) update(
+	arrivalTime time.Time,
+	sendDelta time.Duration,
+	trend float64,
+	numDeltas int,
+) usage {
 	if numDeltas < 2 {
 		d.usage = usageNormal
 
@@ -78,6 +98,29 @@ func (d *overuseDetector) update(sendDelta time.Duration, trend float64, numDelt
 		d.usage = usageNormal
 	}
 	d.previousTrend = trend
+	d.updateThreshold(modifiedTrend, arrivalTime)
 
 	return d.usage
+}
+
+func (d *overuseDetector) updateThreshold(modifiedTrend float64, arrivalTime time.Time) {
+	if !d.hasLastUpdate {
+		d.lastUpdate = arrivalTime
+		d.hasLastUpdate = true
+	}
+
+	if math.Abs(modifiedTrend) > d.delayThreshold+maxAdaptOffset {
+		d.lastUpdate = arrivalTime
+
+		return
+	}
+
+	k := d.kUp
+	if math.Abs(modifiedTrend) < d.delayThreshold {
+		k = d.kDown
+	}
+	delta := min(arrivalTime.Sub(d.lastUpdate), maxThresholdUpdateDelta)
+	d.delayThreshold += k * (math.Abs(modifiedTrend) - d.delayThreshold) * durationToMs(delta)
+	d.delayThreshold = min(max(d.delayThreshold, minDelayThreshold), maxDelayThreshold)
+	d.lastUpdate = arrivalTime
 }
