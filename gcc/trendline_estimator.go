@@ -7,15 +7,15 @@ import (
 	"time"
 )
 
-type trendlineEstimtatorOption func(*trendlineEstimator)
+type trendlineEstimatorOption func(*trendlineEstimator)
 
-func trendlineEstimatorSmoothingCoeff(coeff float64) trendlineEstimtatorOption {
+func trendlineEstimatorSmoothingCoeff(coeff float64) trendlineEstimatorOption {
 	return func(te *trendlineEstimator) {
 		te.smoothingCoeff = coeff
 	}
 }
 
-func trendlineEstimatorWindowSize(size int) trendlineEstimtatorOption {
+func trendlineEstimatorWindowSize(size int) trendlineEstimatorOption {
 	return func(te *trendlineEstimator) {
 		te.windowSize = size
 	}
@@ -37,7 +37,7 @@ type trendlineEstimator struct {
 	history []packetDelay
 }
 
-func newTrendlineEstimator(options ...trendlineEstimtatorOption) *trendlineEstimator {
+func newTrendlineEstimator(options ...trendlineEstimatorOption) *trendlineEstimator {
 	te := &trendlineEstimator{
 		smoothingCoeff:   0.8,
 		windowSize:       10,
