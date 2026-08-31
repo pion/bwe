@@ -12,7 +12,7 @@ import (
 
 func TestOveruseDetectorUpdate(t *testing.T) {
 	type estimate struct {
-		ts        time.Time
+		sendDelta time.Duration
 		trend     float64
 		numDeltas int
 	}
@@ -29,77 +29,81 @@ func TestOveruseDetectorUpdate(t *testing.T) {
 		{
 			name: "confirmsOverUse",
 			values: []estimate{
-				{time.Time{}, 0, 60},
-				{time.Time{}.Add(5 * time.Millisecond), 0.2, 60},
-				{time.Time{}.Add(20 * time.Millisecond), 0.5, 60},
+				{5 * time.Millisecond, 0, 60},
+				{5 * time.Millisecond, 0.2, 60},
+				{15 * time.Millisecond, 0.5, 60},
 			},
 			expected: []usage{usageNormal, usageNormal, usageOver},
 		},
 		{
 			name: "normalUseWithFewerThanTwoDeltas",
 			values: []estimate{
-				{time.Time{}, 1, 0},
-				{time.Time{}.Add(5 * time.Millisecond), 1, 1},
+				{5 * time.Millisecond, 1, 0},
+				{5 * time.Millisecond, 1, 1},
 			},
 			expected: []usage{usageNormal, usageNormal},
 		},
 		{
-			name:     "normaluse",
-			values:   []estimate{{trend: 0, numDeltas: 60}},
+			name: "normaluse",
+			values: []estimate{
+				{sendDelta: 5 * time.Millisecond, trend: 0, numDeltas: 60},
+			},
 			expected: []usage{usageNormal},
 		},
 		{
-			name:     "confirmsUnderUse",
-			values:   []estimate{{time.Time{}, -0.2, 60}},
+			name: "confirmsUnderUse",
+			values: []estimate{
+				{5 * time.Millisecond, -0.2, 60},
+			},
 			expected: []usage{usageUnder},
 		},
 		{
 			name: "noOverUseBeforeDelay",
 			values: []estimate{
-				{time.Time{}.Add(time.Millisecond), 0, 60},
-				{time.Time{}.Add(2 * time.Millisecond), 0.25, 60},
-				{time.Time{}.Add(30 * time.Millisecond), 0.5, 60},
+				{time.Millisecond, 0, 60},
+				{time.Millisecond, 0.25, 60},
+				{28 * time.Millisecond, 0.5, 60},
 			},
 			expected: []usage{usageNormal, usageNormal, usageOver},
 		},
 		{
 			name: "noNewOverUseIfEstimateDecreased",
 			values: []estimate{
-				{time.Time{}.Add(time.Millisecond), 0, 60},
-				{time.Time{}.Add(10 * time.Millisecond), 0.4, 60},
-				{time.Time{}.Add(30 * time.Millisecond), 0.3, 60},
+				{time.Millisecond, 0, 60},
+				{9 * time.Millisecond, 0.4, 60},
+				{20 * time.Millisecond, 0.3, 60},
 			},
 			expected: []usage{usageNormal, usageNormal, usageNormal},
 		},
 		{
 			name: "noOverUseIfRawTrendDecreasesWhileDeltaCountGrows",
 			values: []estimate{
-				{time.Time{}.Add(time.Millisecond), 0, 10},
-				{time.Time{}.Add(10 * time.Millisecond), 1, 20},
-				{time.Time{}.Add(30 * time.Millisecond), 0.9, 40},
+				{time.Millisecond, 0, 10},
+				{9 * time.Millisecond, 1, 20},
+				{20 * time.Millisecond, 0.9, 40},
 			},
 			expected: []usage{usageNormal, usageNormal, usageNormal},
 		},
 		{
 			name: "normalUseWhenTrendFallsBelowThreshold",
 			values: []estimate{
-				{time.Time{}.Add(time.Millisecond), 0, 60},
-				{time.Time{}.Add(10 * time.Millisecond), 0.4, 60},
-				{time.Time{}.Add(30 * time.Millisecond), 0.5, 60},
-				{time.Time{}.Add(35 * time.Millisecond), 0.005, 60},
+				{time.Millisecond, 0, 60},
+				{9 * time.Millisecond, 0.4, 60},
+				{20 * time.Millisecond, 0.5, 60},
+				{5 * time.Millisecond, 0.005, 60},
 			},
 			expected: []usage{usageNormal, usageNormal, usageOver, usageNormal},
 		},
 		{
 			name: "keepsOverUseWhileTrendStaysHigh",
 			values: []estimate{
-				{time.Time{}.Add(5 * time.Millisecond), 0, 60},
-				{time.Time{}.Add(10 * time.Millisecond), 0.004, 60},
-				{time.Time{}.Add(15 * time.Millisecond), 0.00625, 60},
-				{time.Time{}.Add(20 * time.Millisecond), 0.008, 60},
-				{time.Time{}.Add(25 * time.Millisecond), 0.01, 60},
-				{time.Time{}.Add(30 * time.Millisecond), 0.012, 60},
-				{time.Time{}.Add(35 * time.Millisecond), 0.014, 60},
+				{5 * time.Millisecond, 0, 60},
+				{5 * time.Millisecond, 0.004, 60},
+				{5 * time.Millisecond, 0.00625, 60},
+				{5 * time.Millisecond, 0.008, 60},
+				{5 * time.Millisecond, 0.01, 60},
+				{5 * time.Millisecond, 0.012, 60},
+				{5 * time.Millisecond, 0.014, 60},
 			},
 			expected: []usage{
 				usageNormal, usageNormal, usageNormal, usageNormal,
@@ -112,7 +116,7 @@ func TestOveruseDetectorUpdate(t *testing.T) {
 			od := newOveruseDetector()
 			received := []usage{}
 			for _, e := range tc.values {
-				u := od.update(e.ts, e.trend, e.numDeltas)
+				u := od.update(e.sendDelta, e.trend, e.numDeltas)
 				received = append(received, u)
 			}
 			assert.Equal(t, tc.expected, received)

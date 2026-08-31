@@ -19,8 +19,8 @@ type overuseDetector struct {
 	overUseTimeThreshold time.Duration
 	delayThreshold       float64
 	thresholdGain        float64
-	lastUpdate           time.Time
-	firstOverUse         time.Time
+	timeOverUsing        time.Duration
+	overUsing            bool
 	overUseCounter       int
 	previousTrend        float64
 	usage                usage
@@ -31,52 +31,53 @@ func newOveruseDetector() *overuseDetector {
 		overUseTimeThreshold: defaultOveruseTimeThreshold,
 		delayThreshold:       defaultDelayThreshold,
 		thresholdGain:        defaultThresholdGain,
-		lastUpdate:           time.Time{},
-		firstOverUse:         time.Time{},
+		timeOverUsing:        0,
+		overUsing:            false,
 		overUseCounter:       0,
 		previousTrend:        0,
 		usage:                usageNormal,
 	}
 }
 
-func (d *overuseDetector) update(ts time.Time, trend float64, numDeltas int) usage {
+// update processes a trend estimate, where sendDelta is the departure time
+// difference between the two most recent arrival groups.
+func (d *overuseDetector) update(sendDelta time.Duration, trend float64, numDeltas int) usage {
 	if numDeltas < 2 {
 		d.usage = usageNormal
 
 		return d.usage
 	}
 
-	if d.lastUpdate.IsZero() {
-		d.lastUpdate = ts
-	}
-
 	modifiedTrend := math.Min(float64(numDeltas), minNumDeltas) * trend * d.thresholdGain
 
 	switch {
 	case modifiedTrend > d.delayThreshold:
-		if d.firstOverUse.IsZero() {
-			delta := ts.Sub(d.lastUpdate)
-			d.firstOverUse = ts.Add(-delta / 2)
+		if d.overUsing {
+			d.timeOverUsing += sendDelta
+		} else {
+			d.timeOverUsing = sendDelta / 2
+			d.overUsing = true
 		}
 		d.overUseCounter++
-		if ts.Sub(d.firstOverUse) > d.overUseTimeThreshold &&
+		if d.timeOverUsing > d.overUseTimeThreshold &&
 			d.overUseCounter > 1 &&
 			trend >= d.previousTrend {
-			d.firstOverUse = time.Time{}
+			d.timeOverUsing = 0
 			d.overUseCounter = 0
 			d.usage = usageOver
 		}
 	case modifiedTrend < -d.delayThreshold:
-		d.firstOverUse = time.Time{}
+		d.timeOverUsing = 0
+		d.overUsing = false
 		d.overUseCounter = 0
 		d.usage = usageUnder
 	default:
-		d.firstOverUse = time.Time{}
+		d.timeOverUsing = 0
+		d.overUsing = false
 		d.overUseCounter = 0
 		d.usage = usageNormal
 	}
 	d.previousTrend = trend
-	d.lastUpdate = ts
 
 	return d.usage
 }
