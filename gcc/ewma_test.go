@@ -122,3 +122,13 @@ func TestEWMA(t *testing.T) {
 		})
 	}
 }
+
+func TestEWMAHasEstimate(t *testing.T) {
+	e := newEWMA(0.5)
+	assert.False(t, e.hasEstimate())
+
+	// A sample of zero is an estimate like any other.
+	e.update(0)
+	assert.True(t, e.hasEstimate())
+	assert.Zero(t, e.avg())
+}
