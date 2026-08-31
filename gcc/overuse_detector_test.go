@@ -36,6 +36,14 @@ func TestOveruseDetectorUpdate(t *testing.T) {
 			expected: []usage{usageNormal, usageNormal, usageOver},
 		},
 		{
+			name: "normalUseWithFewerThanTwoDeltas",
+			values: []estimate{
+				{time.Time{}, 1, 0},
+				{time.Time{}.Add(5 * time.Millisecond), 1, 1},
+			},
+			expected: []usage{usageNormal, usageNormal},
+		},
+		{
 			name:     "normaluse",
 			values:   []estimate{{trend: 0, numDeltas: 60}},
 			expected: []usage{usageNormal},
