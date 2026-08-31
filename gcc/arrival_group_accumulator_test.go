@@ -10,6 +10,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func newTestGroup(items ...arrivalGroupItem) arrivalGroup {
+	g := arrivalGroup{items: items}
+	for _, it := range items {
+		if it.Departure.After(g.departure) {
+			g.departure = it.Departure
+		}
+		if it.Arrival.After(g.arrival) {
+			g.arrival = it.Arrival
+		}
+	}
+
+	return g
+}
+
 func TestArrivalGroupAccumulator(t *testing.T) {
 	type logItem struct {
 		SequenceNumber uint64
@@ -40,12 +54,10 @@ func TestArrivalGroupAccumulator(t *testing.T) {
 				triggerNewGroupElement,
 			},
 			exp: []arrivalGroup{
-				{
-					{
-						Departure: time.Time{},
-						Arrival:   time.Time{}.Add(time.Millisecond),
-					},
-				},
+				newTestGroup(arrivalGroupItem{
+					Departure: time.Time{},
+					Arrival:   time.Time{}.Add(time.Millisecond),
+				}),
 			},
 		},
 		{
@@ -61,16 +73,18 @@ func TestArrivalGroupAccumulator(t *testing.T) {
 				},
 				triggerNewGroupElement,
 			},
-			exp: []arrivalGroup{{
-				{
-					Departure: time.Time{},
-					Arrival:   time.Time{}.Add(15 * time.Millisecond),
-				},
-				{
-					Departure: time.Time{}.Add(3 * time.Millisecond),
-					Arrival:   time.Time{}.Add(20 * time.Millisecond),
-				},
-			}},
+			exp: []arrivalGroup{
+				newTestGroup(
+					arrivalGroupItem{
+						Departure: time.Time{},
+						Arrival:   time.Time{}.Add(15 * time.Millisecond),
+					},
+					arrivalGroupItem{
+						Departure: time.Time{}.Add(3 * time.Millisecond),
+						Arrival:   time.Time{}.Add(20 * time.Millisecond),
+					},
+				),
+			},
 		},
 		{
 			name: "createsTwoArrivalGroups1",
@@ -90,22 +104,22 @@ func TestArrivalGroupAccumulator(t *testing.T) {
 				triggerNewGroupElement,
 			},
 			exp: []arrivalGroup{
-				{
-					{
+				newTestGroup(
+					arrivalGroupItem{
 						Departure: time.Time{},
 						Arrival:   time.Time{}.Add(15 * time.Millisecond),
 					},
-					{
+					arrivalGroupItem{
 						Departure: time.Time{}.Add(3 * time.Millisecond),
 						Arrival:   time.Time{}.Add(20 * time.Millisecond),
 					},
-				},
-				{
-					{
+				),
+				newTestGroup(
+					arrivalGroupItem{
 						Departure: time.Time{}.Add(9 * time.Millisecond),
 						Arrival:   time.Time{}.Add(24 * time.Millisecond),
 					},
-				},
+				),
 			},
 		},
 		{
@@ -126,22 +140,22 @@ func TestArrivalGroupAccumulator(t *testing.T) {
 				triggerNewGroupElement,
 			},
 			exp: []arrivalGroup{
-				{
-					{
+				newTestGroup(
+					arrivalGroupItem{
 						Departure: time.Time{},
 						Arrival:   time.Time{}.Add(15 * time.Millisecond),
 					},
-				},
-				{
-					{
+				),
+				newTestGroup(
+					arrivalGroupItem{
 						Departure: time.Time{}.Add(6 * time.Millisecond),
 						Arrival:   time.Time{}.Add(34 * time.Millisecond),
 					},
-					{
+					arrivalGroupItem{
 						Departure: time.Time{}.Add(8 * time.Millisecond),
 						Arrival:   time.Time{}.Add(30 * time.Millisecond),
 					},
-				},
+				),
 			},
 		},
 		{
@@ -170,30 +184,30 @@ func TestArrivalGroupAccumulator(t *testing.T) {
 				triggerNewGroupElement,
 			},
 			exp: []arrivalGroup{
-				{
-					{
+				newTestGroup(
+					arrivalGroupItem{
 						SequenceNumber: 0,
 						Departure:      time.Time{},
 						Arrival:        time.Time{}.Add(4 * time.Millisecond),
 					},
-					{
+					arrivalGroupItem{
 						SequenceNumber: 1,
 						Departure:      time.Time{}.Add(3 * time.Millisecond),
 						Arrival:        time.Time{}.Add(4 * time.Millisecond),
 					},
-				},
-				{
-					{
+				),
+				newTestGroup(
+					arrivalGroupItem{
 						SequenceNumber: 2,
 						Departure:      time.Time{}.Add(6 * time.Millisecond),
 						Arrival:        time.Time{}.Add(10 * time.Millisecond),
 					},
-					{
+					arrivalGroupItem{
 						SequenceNumber: 3,
 						Departure:      time.Time{}.Add(9 * time.Millisecond),
 						Arrival:        time.Time{}.Add(10 * time.Millisecond),
 					},
-				},
+				),
 			},
 		},
 		{
@@ -212,18 +226,48 @@ func TestArrivalGroupAccumulator(t *testing.T) {
 				triggerNewGroupElement,
 			},
 			exp: []arrivalGroup{
-				{
-					{
+				newTestGroup(
+					arrivalGroupItem{
 						SequenceNumber: 0,
 						Departure:      time.Time{},
 						Arrival:        time.Time{}.Add(10 * time.Millisecond),
 					},
-					{
+					arrivalGroupItem{
 						SequenceNumber: 1,
 						Departure:      time.Time{}.Add(10 * time.Millisecond),
 						Arrival:        time.Time{}.Add(12 * time.Millisecond),
 					},
+				),
+			},
+		},
+		{
+			name: "reorderedByArrivalTime",
+			log: []logItem{
+				{
+					SequenceNumber: 1,
+					Departure:      time.Time{}.Add(3 * time.Millisecond),
+					Arrival:        time.Time{}.Add(15 * time.Millisecond),
 				},
+				{
+					SequenceNumber: 0,
+					Departure:      time.Time{},
+					Arrival:        time.Time{}.Add(20 * time.Millisecond),
+				},
+				triggerNewGroupElement,
+			},
+			exp: []arrivalGroup{
+				newTestGroup(
+					arrivalGroupItem{
+						SequenceNumber: 1,
+						Departure:      time.Time{}.Add(3 * time.Millisecond),
+						Arrival:        time.Time{}.Add(15 * time.Millisecond),
+					},
+					arrivalGroupItem{
+						SequenceNumber: 0,
+						Departure:      time.Time{},
+						Arrival:        time.Time{}.Add(20 * time.Millisecond),
+					},
+				),
 			},
 		},
 	}
@@ -235,7 +279,7 @@ func TestArrivalGroupAccumulator(t *testing.T) {
 			for _, ack := range tc.log {
 				next := aga.onPacketAcked(ack.SequenceNumber, 0, ack.Departure, ack.Arrival)
 				if next != nil {
-					received = append(received, next)
+					received = append(received, *next)
 				}
 			}
 			assert.Equal(t, tc.exp, received)

@@ -31,9 +31,13 @@ type overuseDetector struct {
 	overusing            bool
 	overuseCounter       int
 	previousTrend        float64
-	lastUpdate           time.Time
-	hasLastUpdate        bool
-	usage                usage
+	// modifiedTrend and comparedThreshold record the most recent comparison
+	// for logging.
+	modifiedTrend     float64
+	comparedThreshold float64
+	lastUpdate        time.Time
+	hasLastUpdate     bool
+	usage             usage
 }
 
 func newOveruseDetector() *overuseDetector {
@@ -47,6 +51,8 @@ func newOveruseDetector() *overuseDetector {
 		overusing:            false,
 		overuseCounter:       0,
 		previousTrend:        0,
+		modifiedTrend:        0,
+		comparedThreshold:    defaultDelayThreshold,
 		lastUpdate:           time.Time{},
 		hasLastUpdate:        false,
 		usage:                usageNormal,
@@ -63,12 +69,16 @@ func (d *overuseDetector) update(
 	numDeltas int,
 ) usage {
 	if numDeltas < 2 {
+		d.modifiedTrend = 0
+		d.comparedThreshold = d.delayThreshold
 		d.usage = usageNormal
 
 		return d.usage
 	}
 
 	modifiedTrend := math.Min(float64(numDeltas), minNumDeltas) * trend * d.thresholdGain
+	d.modifiedTrend = modifiedTrend
+	d.comparedThreshold = d.delayThreshold
 
 	switch {
 	case modifiedTrend > d.delayThreshold:

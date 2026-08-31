@@ -174,6 +174,28 @@ func TestOveruseDetectorUpdate(t *testing.T) {
 	}
 }
 
+func TestOveruseDetectorRecordsComparison(t *testing.T) {
+	od := newOveruseDetector()
+
+	// Fewer than two deltas compares nothing.
+	od.update(time.Time{}, 5*time.Millisecond, 1, 1)
+	assert.Zero(t, od.modifiedTrend)
+	assert.InDelta(t, defaultDelayThreshold, od.comparedThreshold, 1e-9)
+
+	arrival := time.Time{}.Add(5 * time.Millisecond)
+	od.update(arrival, 5*time.Millisecond, 0.09, 60)
+	assert.InDelta(t, 21.6, od.modifiedTrend, 1e-9)
+	assert.InDelta(t, defaultDelayThreshold, od.comparedThreshold, 1e-9)
+
+	// The threshold adapts after the comparison, so the recorded threshold is
+	// the one the trend was measured against and not the adapted one.
+	arrival = arrival.Add(10 * time.Millisecond)
+	od.update(arrival, 5*time.Millisecond, 0.09, 60)
+	assert.InDelta(t, 21.6, od.modifiedTrend, 1e-9)
+	assert.InDelta(t, defaultDelayThreshold, od.comparedThreshold, 1e-9)
+	assert.InDelta(t, 13.2917, od.delayThreshold, 1e-4)
+}
+
 func TestOveruseDetectorUpdateThreshold(t *testing.T) {
 	type estimate struct {
 		arrivalDelta time.Duration

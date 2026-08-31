@@ -31,6 +31,10 @@ func (a *ewma) update(sample float64) {
 	a.variance = (1 - a.alpha) * (a.variance + a.alpha*delta*delta)
 }
 
+func (a *ewma) hasEstimate() bool {
+	return a.initialized
+}
+
 func (a *ewma) avg() float64 {
 	return a.average
 }
