@@ -40,6 +40,12 @@ func newOveruseDetector() *overuseDetector {
 }
 
 func (d *overuseDetector) update(ts time.Time, trend float64, numDeltas int) usage {
+	if numDeltas < 2 {
+		d.usage = usageNormal
+
+		return d.usage
+	}
+
 	if d.lastUpdate.IsZero() {
 		d.lastUpdate = ts
 	}
