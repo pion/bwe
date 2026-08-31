@@ -58,11 +58,11 @@ func TestOveruseDetectorUpdate(t *testing.T) {
 			expected: []usage{usageUnder},
 		},
 		{
-			name: "noOveruseBeforeDelay",
+			name: "noOveruseUntilCounterExceedsOne",
 			values: []estimate{
 				{time.Millisecond, 0, 60},
-				{time.Millisecond, 0.25, 60},
-				{28 * time.Millisecond, 0.5, 60},
+				{20 * time.Millisecond, 0.25, 60},
+				{5 * time.Millisecond, 0.5, 60},
 			},
 			expected: []usage{usageNormal, usageNormal, usageOver},
 		},
@@ -93,6 +93,43 @@ func TestOveruseDetectorUpdate(t *testing.T) {
 				{5 * time.Millisecond, 0.005, 60},
 			},
 			expected: []usage{usageNormal, usageNormal, usageOver, usageNormal},
+		},
+		{
+			name: "noOveruseBeforeTimeThreshold",
+			values: []estimate{
+				{time.Millisecond, 0.010, 60},
+				{time.Millisecond, 0.011, 60},
+				{time.Millisecond, 0.012, 60},
+				{time.Millisecond, 0.013, 60},
+				{time.Millisecond, 0.014, 60},
+				{time.Millisecond, 0.015, 60},
+			},
+			expected: []usage{
+				usageNormal, usageNormal, usageNormal,
+				usageNormal, usageNormal, usageOver,
+			},
+		},
+		{
+			name: "underuseToOveruse",
+			values: []estimate{
+				{5 * time.Millisecond, -0.2, 60},
+				{5 * time.Millisecond, 0.01, 60},
+				{5 * time.Millisecond, 0.02, 60},
+			},
+			expected: []usage{usageUnder, usageUnder, usageOver},
+		},
+		{
+			name: "keepsOveruseWhileTrendDecreasesAboveThreshold",
+			values: []estimate{
+				{5 * time.Millisecond, 0, 60},
+				{5 * time.Millisecond, 0.01, 60},
+				{5 * time.Millisecond, 0.02, 60},
+				{5 * time.Millisecond, 0.015, 60},
+				{5 * time.Millisecond, 0.014, 60},
+			},
+			expected: []usage{
+				usageNormal, usageNormal, usageOver, usageOver, usageOver,
+			},
 		},
 		{
 			name: "keepsOveruseWhileTrendStaysHigh",
