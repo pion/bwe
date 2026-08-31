@@ -16,24 +16,24 @@ const (
 )
 
 type overuseDetector struct {
-	overUseTimeThreshold time.Duration
+	overuseTimeThreshold time.Duration
 	delayThreshold       float64
 	thresholdGain        float64
-	timeOverUsing        time.Duration
-	overUsing            bool
-	overUseCounter       int
+	timeOverusing        time.Duration
+	overusing            bool
+	overuseCounter       int
 	previousTrend        float64
 	usage                usage
 }
 
 func newOveruseDetector() *overuseDetector {
 	return &overuseDetector{
-		overUseTimeThreshold: defaultOveruseTimeThreshold,
+		overuseTimeThreshold: defaultOveruseTimeThreshold,
 		delayThreshold:       defaultDelayThreshold,
 		thresholdGain:        defaultThresholdGain,
-		timeOverUsing:        0,
-		overUsing:            false,
-		overUseCounter:       0,
+		timeOverusing:        0,
+		overusing:            false,
+		overuseCounter:       0,
 		previousTrend:        0,
 		usage:                usageNormal,
 	}
@@ -52,29 +52,29 @@ func (d *overuseDetector) update(sendDelta time.Duration, trend float64, numDelt
 
 	switch {
 	case modifiedTrend > d.delayThreshold:
-		if d.overUsing {
-			d.timeOverUsing += sendDelta
+		if d.overusing {
+			d.timeOverusing += sendDelta
 		} else {
-			d.timeOverUsing = sendDelta / 2
-			d.overUsing = true
+			d.timeOverusing = sendDelta / 2
+			d.overusing = true
 		}
-		d.overUseCounter++
-		if d.timeOverUsing > d.overUseTimeThreshold &&
-			d.overUseCounter > 1 &&
+		d.overuseCounter++
+		if d.timeOverusing > d.overuseTimeThreshold &&
+			d.overuseCounter > 1 &&
 			trend >= d.previousTrend {
-			d.timeOverUsing = 0
-			d.overUseCounter = 0
+			d.timeOverusing = 0
+			d.overuseCounter = 0
 			d.usage = usageOver
 		}
 	case modifiedTrend < -d.delayThreshold:
-		d.timeOverUsing = 0
-		d.overUsing = false
-		d.overUseCounter = 0
+		d.timeOverusing = 0
+		d.overusing = false
+		d.overuseCounter = 0
 		d.usage = usageUnder
 	default:
-		d.timeOverUsing = 0
-		d.overUsing = false
-		d.overUseCounter = 0
+		d.timeOverusing = 0
+		d.overusing = false
+		d.overuseCounter = 0
 		d.usage = usageNormal
 	}
 	d.previousTrend = trend
