@@ -70,7 +70,6 @@ func createVirtualNetwork(t *testing.T) *network {
 
 	leftNet, err := vnet.NewNet(&vnet.NetConfig{
 		StaticIPs: []string{"10.0.1.101"},
-		StaticIP:  "",
 	})
 	assert.NoError(t, err)
 	err = leftRouter.AddNet(leftNet)
@@ -78,7 +77,6 @@ func createVirtualNetwork(t *testing.T) *network {
 
 	rightNet, err := vnet.NewNet(&vnet.NetConfig{
 		StaticIPs: []string{"10.0.2.101"},
-		StaticIP:  "",
 	})
 	assert.NoError(t, err)
 	err = rightRouter.AddNet(rightNet)
