@@ -241,7 +241,7 @@ func TestArrivalGroupAccumulator(t *testing.T) {
 			},
 		},
 		{
-			name: "reorderedByArrivalTime",
+			name: "ignoresOutOfOrderPackets",
 			log: []logItem{
 				{
 					SequenceNumber: 1,
@@ -262,10 +262,57 @@ func TestArrivalGroupAccumulator(t *testing.T) {
 						Departure:      time.Time{}.Add(3 * time.Millisecond),
 						Arrival:        time.Time{}.Add(15 * time.Millisecond),
 					},
+				),
+			},
+		},
+		{
+			name: "ignoresOutOfOrderPacketsMultipleTimes",
+			log: []logItem{
+				{
+					SequenceNumber: 1,
+					Departure:      time.Time{}.Add(3 * time.Millisecond),
+					Arrival:        time.Time{}.Add(15 * time.Millisecond),
+				},
+				{
+					SequenceNumber: 0,
+					Departure:      time.Time{},
+					Arrival:        time.Time{}.Add(20 * time.Millisecond),
+				},
+				{
+					SequenceNumber: 2,
+					Departure:      time.Time{}.Add(6 * time.Millisecond),
+					Arrival:        time.Time{}.Add(25 * time.Millisecond),
+				},
+				{
+					SequenceNumber: 4,
+					Departure:      time.Time{}.Add(12 * time.Millisecond),
+					Arrival:        time.Time{}.Add(30 * time.Millisecond),
+				},
+				{
+					SequenceNumber: 3,
+					Departure:      time.Time{}.Add(9 * time.Millisecond),
+					Arrival:        time.Time{}.Add(35 * time.Millisecond),
+				},
+				triggerNewGroupElement,
+			},
+			exp: []arrivalGroup{
+				newTestGroup(
 					arrivalGroupItem{
-						SequenceNumber: 0,
-						Departure:      time.Time{},
-						Arrival:        time.Time{}.Add(20 * time.Millisecond),
+						SequenceNumber: 1,
+						Departure:      time.Time{}.Add(3 * time.Millisecond),
+						Arrival:        time.Time{}.Add(15 * time.Millisecond),
+					},
+					arrivalGroupItem{
+						SequenceNumber: 2,
+						Departure:      time.Time{}.Add(6 * time.Millisecond),
+						Arrival:        time.Time{}.Add(25 * time.Millisecond),
+					},
+				),
+				newTestGroup(
+					arrivalGroupItem{
+						SequenceNumber: 4,
+						Departure:      time.Time{}.Add(12 * time.Millisecond),
+						Arrival:        time.Time{}.Add(30 * time.Millisecond),
 					},
 				),
 			},
