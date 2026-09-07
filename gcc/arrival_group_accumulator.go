@@ -70,6 +70,12 @@ func (a *arrivalGroupAccumulator) onPacketAcked(
 	}
 
 	sendTimeDelta := departure.Sub(a.next.items[0].Departure)
+
+	// Any packets received out of order are ignored by the arrival-time model.
+	if sendTimeDelta < 0 {
+		return nil
+	}
+
 	if sendTimeDelta < a.burstInterval {
 		a.next.append(item)
 
