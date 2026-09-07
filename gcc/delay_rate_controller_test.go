@@ -106,6 +106,35 @@ func TestDelayRateControllerDropsReorderd(t *testing.T) {
 	assert.Equal(t, 15*time.Millisecond, controller.lastArrivalGroup.departure.Sub(base))
 }
 
+func TestDelayRateControllerDropsNegativeInterArrivalTime(t *testing.T) {
+	controller := newDelayRateController(1_000_000, 500_000, 2_000_000, nil)
+	base := time.Time{}.Add(time.Hour)
+	ack := func(seq uint64, departure, arrival time.Duration) {
+		controller.onPacketAcked(seq, 1200, base.Add(departure), base.Add(arrival))
+	}
+
+	// The first group holds a packet that arrives much later than the group's
+	// first, so the group's arrival anchor is ahead of the next group's.
+	ack(0, 0, 0)
+	ack(1, time.Millisecond, 200*time.Millisecond)
+
+	// Closes the first group, which becomes lastArrivalGroup.
+	ack(2, 10*time.Millisecond, 100*time.Millisecond)
+	assert.Equal(t, 200*time.Millisecond, controller.lastArrivalGroup.arrival.Sub(base))
+
+	// Closes the second group, which arrived before the first one: the
+	// inter-arrival time is negative and the sample is dropped.
+	ack(3, 20*time.Millisecond, 110*time.Millisecond)
+	assert.False(t, controller.usageUpdated)
+	assert.Zero(t, controller.samples)
+	assert.Equal(t, 100*time.Millisecond, controller.lastArrivalGroup.arrival.Sub(base))
+
+	// Both deltas are positive again, so the next group is a usable sample.
+	ack(4, 30*time.Millisecond, 300*time.Millisecond)
+	assert.True(t, controller.usageUpdated)
+	assert.Equal(t, 1, controller.samples)
+}
+
 func TestDelayRateControllerUpdate(t *testing.T) {
 	cases := []struct {
 		name         string
