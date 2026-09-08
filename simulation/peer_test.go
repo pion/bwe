@@ -11,7 +11,7 @@ import (
 	"github.com/pion/interceptor/pkg/rfc8888"
 	"github.com/pion/interceptor/pkg/rtpfb"
 	"github.com/pion/logging"
-	"github.com/pion/transport/v3/vnet"
+	"github.com/pion/transport/v4/vnet"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -20,9 +20,12 @@ type option func(*peer) error
 func setVNet(vnet *vnet.Net, publicIPs []string) option {
 	return func(p *peer) error {
 		p.settingEngine.SetNet(vnet)
-		p.settingEngine.SetNAT1To1IPs(publicIPs, webrtc.ICECandidateTypeHost)
 
-		return nil
+		return p.settingEngine.SetICEAddressRewriteRules(webrtc.ICEAddressRewriteRule{
+			External:        publicIPs,
+			AsCandidateType: webrtc.ICECandidateTypeHost,
+			Mode:            webrtc.ICEAddressRewriteReplace,
+		})
 	}
 }
 
