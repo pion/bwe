@@ -82,7 +82,7 @@ func TestDelayRateControllerOnPacketAcked(t *testing.T) {
 	}
 }
 
-func TestDelayRateControllerDropsReorderd(t *testing.T) {
+func TestDelayRateControllerKeepsReorderedSamples(t *testing.T) {
 	controller := newDelayRateController(1_000_000, 500_000, 2_000_000, nil)
 	base := time.Time{}.Add(time.Hour)
 	ack := func(seq uint64, departure, arrival time.Duration) {
@@ -94,16 +94,21 @@ func TestDelayRateControllerDropsReorderd(t *testing.T) {
 	ack(2, 6*time.Millisecond, 100*time.Millisecond)
 	assert.False(t, controller.usageUpdated)
 	assert.Zero(t, controller.samples)
+	assert.Equal(t, 50*time.Millisecond, controller.lastArrivalGroup.departure.Sub(base))
 
 	ack(3, 15*time.Millisecond, 150*time.Millisecond)
-	assert.False(t, controller.usageUpdated)
-	assert.Zero(t, controller.samples)
-	assert.Equal(t, 6*time.Millisecond, controller.lastArrivalGroup.departure.Sub(base))
-
-	ack(4, 25*time.Millisecond, 200*time.Millisecond)
 	assert.True(t, controller.usageUpdated)
 	assert.Equal(t, 1, controller.samples)
-	assert.Equal(t, 15*time.Millisecond, controller.lastArrivalGroup.departure.Sub(base))
+	assert.Equal(t, 6*time.Millisecond, controller.lastArrivalGroup.departure.Sub(base))
+	assert.Equal(t, 142*time.Millisecond, controller.trend.accumulatedDelay)
+
+	ack(4, 25*time.Millisecond, 200*time.Millisecond)
+	ack(5, 60*time.Millisecond, 250*time.Millisecond)
+	ack(6, 70*time.Millisecond, 300*time.Millisecond)
+	assert.Equal(t, 4, controller.samples)
+	assert.Equal(t, 60*time.Millisecond, controller.lastArrivalGroup.departure.Sub(base))
+
+	assert.Equal(t, 238*time.Millisecond, controller.trend.accumulatedDelay)
 }
 
 func TestDelayRateControllerUpdate(t *testing.T) {
