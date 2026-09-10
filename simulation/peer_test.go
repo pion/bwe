@@ -1,18 +1,42 @@
 // SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
-//go:build !js
-
 package simulation
 
 import (
+	"log/slog"
+	"time"
+
+	"github.com/pion/bwe/gcc"
 	"github.com/pion/interceptor"
+	"github.com/pion/interceptor/pkg/pacing"
 	"github.com/pion/interceptor/pkg/packetdump"
 	"github.com/pion/interceptor/pkg/rfc8888"
 	"github.com/pion/interceptor/pkg/rtpfb"
+	"github.com/pion/interceptor/pkg/twcc"
 	"github.com/pion/logging"
+	"github.com/pion/rtp"
+	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/v4/vnet"
 	"github.com/pion/webrtc/v4"
+)
+
+const (
+	feedbackInterval = 20 * time.Millisecond
+
+	gccInitialRate = 500_000
+	gccMinRate     = 128_000
+	gccMaxRate     = 50_000_000
+
+	// codecRateFactor is the share of the target rate the codec is driven at.
+	// The remainder pays for the per packet header and auth tag overhead, at
+	// most 2.5% of a full packet.
+	codecRateFactor = 0.97
+
+	// pacerRateFactor is the share of the target rate the pacer is allowed to
+	// send at. The headroom lets the pacer drain a burst rather than spread it
+	// over the following frames.
+	pacerRateFactor = 1.5
 )
 
 type option func(*peer) error
@@ -51,20 +75,26 @@ func registerDefaultCodecs() option {
 	}
 }
 
-func registerPacketLogger(vantagePoint string) option {
-	return func(p *peer) error {
-		ipl := &packetLogger{vantagePoint: vantagePoint, direction: "in"}
-		rd, err := packetdump.NewReceiverInterceptor(packetdump.PacketLog(ipl))
+func registerPacketLogger(logger *slog.Logger, recordIn, recordOut rtpRecorder) option {
+	return func(peer *peer) error {
+		ipl := newPacketLogger(logger, "in", recordIn)
+		rd, err := packetdump.NewReceiverInterceptor(
+			packetdump.PacketLog(ipl),
+			packetdump.WithLoggerFactory(peer.loggerFactory),
+		)
 		if err != nil {
 			return err
 		}
-		opl := &packetLogger{vantagePoint: vantagePoint, direction: "out"}
-		sd, err := packetdump.NewSenderInterceptor(packetdump.PacketLog(opl))
+		opl := newPacketLogger(logger, "out", recordOut)
+		sd, err := packetdump.NewSenderInterceptor(
+			packetdump.PacketLog(opl),
+			packetdump.WithLoggerFactory(peer.loggerFactory),
+		)
 		if err != nil {
 			return err
 		}
-		p.interceptorRegistry.Add(rd)
-		p.interceptorRegistry.Add(sd)
+		peer.interceptorRegistry.Add(rd)
+		peer.interceptorRegistry.Add(sd)
 
 		return nil
 	}
@@ -72,7 +102,7 @@ func registerPacketLogger(vantagePoint string) option {
 
 func registerRTPFB() option {
 	return func(p *peer) error {
-		rtpfb, err := rtpfb.NewInterceptor()
+		rtpfb, err := rtpfb.NewInterceptor(rtpfb.WithLoggerFactory(p.loggerFactory))
 		if err != nil {
 			return err
 		}
@@ -82,33 +112,47 @@ func registerRTPFB() option {
 	}
 }
 
-// func registerTWCC() option {
-// 	return func(p *peer) error {
-// 		twcc, err := twcc.NewSenderInterceptor()
-// 		if err != nil {
-// 			return err
-// 		}
-// 		p.interceptorRegistry.Add(twcc)
-//
-// 		return nil
-// 	}
-// }
-//
-// func registerTWCCHeaderExtension() option {
-// 	return func(p *peer) error {
-// 		twccHdrExt, err := twcc.NewHeaderExtensionInterceptor()
-// 		if err != nil {
-// 			return err
-// 		}
-// 		p.interceptorRegistry.Add(twccHdrExt)
-//
-// 		return nil
-// 	}
-// }
+func registerTWCCForKind(mediaEngine *webrtc.MediaEngine, kind webrtc.RTPCodecType) error {
+	mediaEngine.RegisterFeedback(webrtc.RTCPFeedback{Type: webrtc.TypeRTCPFBTransportCC}, kind)
+
+	return mediaEngine.RegisterHeaderExtension(
+		webrtc.RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, kind,
+	)
+}
+
+func registerTWCC() option {
+	return func(peer *peer) error {
+		for _, kind := range []webrtc.RTPCodecType{webrtc.RTPCodecTypeVideo, webrtc.RTPCodecTypeAudio} {
+			if err := registerTWCCForKind(peer.mediaEngine, kind); err != nil {
+				return err
+			}
+		}
+
+		generator, err := twcc.NewSenderInterceptor(
+			twcc.SendInterval(feedbackInterval),
+			twcc.WithLoggerFactory(peer.loggerFactory),
+		)
+		if err != nil {
+			return err
+		}
+		peer.interceptorRegistry.Add(generator)
+
+		return nil
+	}
+}
+
+func registerTWCCHeaderExtension() option {
+	return func(p *peer) error {
+		return webrtc.ConfigureTWCCHeaderExtensionSender(p.mediaEngine, p.interceptorRegistry)
+	}
+}
 
 func registerCCFB() option {
 	return func(p *peer) error {
-		ccfb, err := rfc8888.NewSenderInterceptor()
+		ccfb, err := rfc8888.NewSenderInterceptor(
+			rfc8888.SendInterval(feedbackInterval),
+			rfc8888.WithLoggerFactory(p.loggerFactory),
+		)
 		if err != nil {
 			return err
 		}
@@ -118,9 +162,41 @@ func registerCCFB() option {
 	}
 }
 
+func initGCC() option {
+	return func(p *peer) (err error) {
+		p.estimator, err = gcc.NewSendSideController(
+			gccInitialRate, gccMinRate, gccMaxRate,
+			gcc.WithLoggerFactory(p.loggerFactory),
+		)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+}
+
+func setOnRateCallback(onRateUpdate func(int)) option {
+	return func(p *peer) error {
+		p.onRateUpdate = onRateUpdate
+
+		return nil
+	}
+}
+
+func registerPacer() option {
+	return func(p *peer) error {
+		p.pacer = pacing.NewInterceptor(pacing.WithLoggerFactory(p.loggerFactory))
+		p.interceptorRegistry.Add(p.pacer)
+
+		return nil
+	}
+}
+
 type peer struct {
-	logger logging.LeveledLogger
-	pc     *webrtc.PeerConnection
+	loggerFactory logging.LoggerFactory
+	logger        logging.LeveledLogger
+	pc            *webrtc.PeerConnection
 
 	settingEngine       *webrtc.SettingEngine
 	mediaEngine         *webrtc.MediaEngine
@@ -128,13 +204,20 @@ type peer struct {
 
 	onRemoteTrack func(*webrtc.TrackRemote)
 	onConnected   func()
+
+	pacer        *pacing.InterceptorFactory
+	estimator    *gcc.SendSideController
+	onRateUpdate func(int)
+
+	rtpSender *webrtc.RTPSender
 }
 
-func newPeer(opts ...option) (*peer, error) {
+func newPeer(loggerFactory logging.LoggerFactory, opts ...option) (*peer, error) {
 	peer := &peer{
-		logger:              logging.NewDefaultLoggerFactory().NewLogger("bwe_test_peer"),
+		loggerFactory:       loggerFactory,
+		logger:              loggerFactory.NewLogger("bwe_test_peer"),
 		pc:                  nil,
-		settingEngine:       &webrtc.SettingEngine{},
+		settingEngine:       &webrtc.SettingEngine{LoggerFactory: loggerFactory},
 		mediaEngine:         &webrtc.MediaEngine{},
 		interceptorRegistry: &interceptor.Registry{},
 		onRemoteTrack:       nil,
@@ -256,7 +339,11 @@ func (p *peer) addLocalTrack() (*webrtc.TrackLocalStaticSample, error) {
 		Channels:     0,
 		SDPFmtpLine:  "",
 		RTCPFeedback: []webrtc.RTCPFeedback{},
-	}, "video", "pion")
+	}, "video", "pion", webrtc.WithPayloader(
+		func(webrtc.RTPCodecCapability) (rtp.Payloader, error) {
+			return &perfectPayloader{}, nil
+		},
+	))
 	if err != nil {
 		return nil, err
 	}
@@ -264,9 +351,13 @@ func (p *peer) addLocalTrack() (*webrtc.TrackLocalStaticSample, error) {
 	if err != nil {
 		return nil, err
 	}
-	go p.readRTCP(s)
+	p.rtpSender = s
 
 	return track, err
+}
+
+func (p *peer) startRTCPReader() {
+	go p.readRTCP(p.rtpSender)
 }
 
 func (p *peer) addRemoteTrack() error {
@@ -277,9 +368,38 @@ func (p *peer) addRemoteTrack() error {
 
 func (p *peer) readRTCP(r *webrtc.RTPSender) {
 	for {
-		_, _, err := r.ReadRTCP()
+		_, attr, err := r.ReadRTCP()
 		if err != nil {
 			return
+		}
+		report, ok := attr.Get(rtpfb.CCFBAttributesKey).(rtpfb.Report)
+		if ok {
+			p.updateTargetRate(report)
+		}
+	}
+}
+
+func (p *peer) updateTargetRate(report rtpfb.Report) {
+	if p.estimator != nil {
+		for _, pr := range report.PacketReports {
+			if pr.Arrived {
+				p.estimator.OnAck(
+					pr.SequenceNumber,
+					pr.Size,
+					pr.Departure,
+					pr.Arrival,
+				)
+			} else {
+				p.estimator.OnLoss()
+			}
+		}
+		rate := p.estimator.OnFeedback(report.Arrival, report.RTT)
+		p.logger.Infof("new target rate: %v", rate)
+		if p.onRateUpdate != nil {
+			p.onRateUpdate(rate)
+		}
+		if p.pacer != nil {
+			p.pacer.SetRate(p.pc.ID(), int(pacerRateFactor*float64(rate)))
 		}
 	}
 }
