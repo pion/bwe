@@ -94,16 +94,6 @@ func (c *delayRateController) onPacketAcked(sequenceNumber uint64, size int, dep
 	interArrivalTime := groupArrival.Sub(lastGroupArrival)
 	interDepartureTime := groupDeparture.Sub(lastGroupDeparture)
 
-	// A non-positive delta means the two groups' departures were reordered
-	// relative to their arrivals, which the trend estimator and overuse
-	// detector aren't defined for. Drop this sample but still advance past
-	// it, so the next group compares against current data.
-	if interDepartureTime <= 0 {
-		c.lastArrivalGroup = *next
-
-		return
-	}
-
 	interGroupDelay := interArrivalTime - interDepartureTime
 
 	trend := c.trend.update(groupArrival, interGroupDelay)
